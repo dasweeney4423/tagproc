@@ -1,0 +1,15 @@
+Package: TagProcApp
+Type: Package
+Title: An app for getting your Wildlife Computers tag data
+from raw to ready
+Version: 0.1.0
+Author: Marine Ecology & Telemetry Research
+Maintainer: David Sweeney (dsweeney@marecotel.org)
+Description: The aim of the app is to serve as a “one-stop shop” that streamlines all the
+various steps of tag processing into a simple workflow, allowing you to
+ensure that multiple deployments are all processed in the exact same way.
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+URL: http://github.com/dasweeney/TagProcApp
+BugReports: http://github.com/dasweeney/TagProcApp/issues
