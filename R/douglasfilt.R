@@ -547,6 +547,10 @@ douglasfilt <- function(argos, argos_method, method, keep_lc = NULL, maxredun = 
   outliers <- rbind(outliers, argos[which(argos$outlier == TRUE),])
   argos <- argos[which(argos$outlier == FALSE),]
 
+  ###############################################################################
+  ################################BOD_filt#######################################
+  ###############################################################################
+
   #perform best of day post-filtering if desired
   retained <- data.frame()
   if (best_of_day == TRUE) {
@@ -750,6 +754,10 @@ douglasfilt <- function(argos, argos_method, method, keep_lc = NULL, maxredun = 
   } else { #if not using one of the best_of_day methods, retained locations are all of the argos locations kept thus far
     retained <- argos
   }
+
+  ###############################################################################
+  ###############################################################################
+  ###############################################################################
 
   #remove outliers from retained data and create combined dataframe and make sure user locations are kept in retained
   for (i in 1:nrow(argos)) {
