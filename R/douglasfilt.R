@@ -2,9 +2,10 @@
 #'
 #' This funciton is used to perform the Douglas Argos-Filter Algorithm on animal-track data provided from the Argos System for one individual from one tag.
 #' @param argos An R dataframe of the argos locations. The dataframe must only include argos locations for one individual and one tag. To filter multiple individuals and tags, this function must be run separately for each.
+#' @param argos_method A string specifying the data is from CLS' least-squared method (input == 'LS') or from the Kalman method (input == 'K').
 #' @param method A string specifying the desired Douglas Argos-filtering method to be used. Options include 'MRD', 'DAR', or 'HYB'.
 #' @param keep_lc The lc for which argos locations equal to or better than are retained according to the filtering method specified. If not specified, no argos locations are unconditionally kept because of their lc.
-#' @param maxredun A required input for all filtering methods. This variable (units = km) is used to filter the Argos locations such that every retained location has a temporally neear-consecutive location that is spatially within the defined distance. See the following notes for more information on how this input is used differently in each filtering method.
+#' @param maxredun A required input for all filtering methods. This variable (units = km) is used to filter the Argos locations such that every retained location has a temporally near-consecutive location that is spatially within the defined distance. See the following notes for more information on how this input is used differently in each filtering method.
 #' @param duplrec A string specifying what to do in the cases where two argos locations have the same time stamp. If the input is 'offset' (default), then replicate times are offset by one second. If the input is 'filter', then replicates are marked as outliers and removed from the data before filtering.
 #' @param keeplast Logical. An input only required if using the MRD or HYB filtering method. If FALSE (default), the last argos location is not unconditionally retained during filtering. If TRUE, the last argos location is unconditionally retained regardless of whether or not is passes the other filtering requirements.
 #' @param skiploc Logical. An input only required if using the MRD or HYB filtering method. If FALSE (default), locations that are initially marked as an outlier are retested in the following round and have the chance of being retained if passing the second round of testing. If FALSE, locations that are initially marked as outliers are not retested and remain listed as an outlier.
@@ -21,7 +22,7 @@
 #' @param best_of_day Logical. If TRUE, an additional filtering process is carried out the only retains the "best location of the day" according to the method specified by the input rankmeth. Default is FALSE.
 #' @param minoffh An input only required if best_of_day is TRUE and if you desire to filter according to PTT duty cycles rather than by GMT days. This input (units = hours) should be a little bit greater than the minimum OFF duration of the duty cycle and a little bit less than the maximum ON duration of the duty cycle. See the notes section for more information about how to properly set this input.
 #' @param rankmeth An input only required if best_of_day is TRUE. The best location for the given cluster (GMT day or duty cycle depending on if minoffh is specified or not) is chosen by the following hierarchy of DIAG variables. For an input of 1 (default): lc, iqx, iqy, and nbmes. For an input of 2: lc, iqx, nbmes, and iqy. For an input of 3: lc and nbmes. As the cluster of locations passes through each DIAG variable test, the location with the highest values according to the hierachy is retained and all other locations in that cluster are filtered out.
-#' @return A list of three elements in similar format to the data provided in the input for argos (note: if the input for duplrec was 'offset', times might be slightly different that the original data; all lat/lon primary and alternate locations were initially checked to find the shortest animal route through al combinations of primary and alternate locations and the determined superior locations are given the column header 'Longitude' or 'Latitude'):
+#' @return A list of three elements in similar format to the data provided in the input for argos (note: if the input for duplrec was 'offset', times might be slightly different that the original data; all lat/lon primary and alternate locations were initially checked to find the shortest animal route through al combinations of primary and alternate locations and the determined superior locations are given the column header 'lon' or 'lat'):
 #' \itemize{
 #' \item{\strong{all: }} A dataframe containing all input argos locations with an additional column specifying whether the Douglas Argos-Filter marked the given location as an outlier or not.
 #' \item{\strong{retained: }} A dataframe containing all retained input argos locations following the execution of the Douglas Argos-Filter algorithm.
@@ -31,7 +32,7 @@
 #' @export
 #' @examples #examples not yet provided, sorry :(
 
-douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec = 'offset', #inputs required by all filtering methods
+douglasfilt <- function(argos, argos_method, method, keep_lc = NULL, maxredun = NULL, duplrec = 'offset', #inputs required by all filtering methods
                         keeplast = FALSE, skiploc = FALSE, #inputs for MRD filter
                         minrate = NULL, ratecoef = NULL, r_only = FALSE, #inputs for DAR filter
                         xmigrate = NULL, xoverrun = NULL, xdirect = NULL, xangle = NULL, xpercent = NULL, testp_0a = NULL, testp_bz = NULL, #inputs for Best Hybrid filter
@@ -51,38 +52,37 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
   #create necessary objects for later
   outliers <- data.frame()
 
-  #convert dates and times into class POSIXct datetime and convert lc and type to characters
-  if ('POSIXct' %in% class(argos$Date) == FALSE) {
-    argos$Date <- as.POSIXct(as.character(argos$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
+  #convert dates and times into class POSIXct datetime and convert lc to characters
+  if ('POSIXct' %in% class(argos$datetime) == FALSE) {
+    argos$datetime <- as.POSIXct(as.character(argos$datetime), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
   }
-  argos$Quality <- as.character(argos$Quality)
-  argos$Type <- as.character(argos$Type)
+  argos$lc <- as.character(argos$lc)
 
   #temporarily change lc letters to numbers to allow for easier comparison
   user <- data.frame()
   for (r in 1:nrow(argos)) {
-    if (argos$Type[r] == 'User') {
+    if (argos$lc[r] %in% c('User', 'DP')) {
       user <- rbind(user, argos[r,]) #pull out user defined locations to ensure they are kept after filtering
-      argos$Quality[r] <- 3
+      argos$lc[r] <- 4
     }
-    if (argos$Quality[r] == 'Z') {
-      argos$Quality[r] <- -3
+    if (argos$lc[r] == 'Z') {
+      argos$lc[r] <- -3
     }
-    if (argos$Quality[r] == 'B') {
-      argos$Quality[r] <- -2
+    if (argos$lc[r] == 'B') {
+      argos$lc[r] <- -2
     }
-    if (argos$Quality[r] == 'A') {
-      argos$Quality[r] <- -1
+    if (argos$lc[r] == 'A') {
+      argos$lc[r] <- -1
     }
   }
-  argos$Quality <- as.numeric(argos$Quality)
+  argos$lc <- as.numeric(argos$lc)
   if (nrow(user) > 0) {
     user$outlier <- FALSE
   }
 
   #handle instances where there are duplicate times for multiple rows of locations
   if (duplrec == 'offset') {
-    if (all(duplicated(argos$Date) == FALSE)) { #if all locations are not duplicates, move on
+    if (all(duplicated(argos$datetime) == FALSE)) { #if all locations are not duplicates, move on
       done <- TRUE
     } else {
       done <- FALSE
@@ -90,10 +90,10 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
 
     #fix duplicated rows
     while (done == FALSE) {
-      argos$Date[duplicated(argos$Date)] <- argos$Date[duplicated(argos$Date)] + 1 #add one second to all duplicated datetimes
+      argos$datetime[duplicated(argos$datetime)] <- argos$datetime[duplicated(argos$datetime)] + 1 #add one second to all duplicated datetimes
 
       #check again to see if duplicated are still present
-      if (all(duplicated(argos$Date) == FALSE)) { #if all locations are not duplicates, move on
+      if (all(duplicated(argos$datetime) == FALSE)) { #if all locations are not duplicates, move on
         done <- TRUE
       } else {
         done <- FALSE
@@ -102,13 +102,171 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
   } else {
     if (duplrec == 'filter') {
       argos$outlier <- FALSE
-      argos$outlier[duplicated(argos$Date)] <- TRUE
+      argos$outlier[duplicated(argos$datetime)] <- TRUE
 
       #remove outliers from argos data
       outliers <- rbind(outliers, argos[which(argos$outlier == TRUE),])
       argos <- argos[which(argos$outlier == FALSE),]
     } else {
       stop('Invalid input for duplrec. Valid options are offset or filter.')
+    }
+  }
+
+  ###############################################################################
+  #########################primary vs. alternate#################################
+  ###############################################################################
+
+  #find best of primary and alternate locations if data in least-squares argos locations
+  if (argos_method == 'LS') {
+    Zclass <- argos[which(argos$lc == -3),]
+    Zclass$lat <- NA
+    Zclass$lon <- NA
+    user_rows <- argos[which(argos$lc == -4),]
+    user_rows$lat <- user_rows$lat_p
+    user_rows$lon <- user_rows$lon_p
+    argos <- argos[which(argos$lc != -3),]
+
+    #create starting locations and distances/loc-strings
+    l1 <- 1
+    l2 <- l1 + 1
+    while (l2 <= nrow(argos)) {
+      #get locations
+      loc1p <- c(argos$lon_p[l1], argos$lat_p[l1])
+      loc1a <- c(argos$lon_a[l1], argos$lat_a[l1])
+      loc2p <- c(argos$lon_p[l2], argos$lat_p[l2])
+      loc2a <- c(argos$lon_a[l2], argos$lat_a[l2])
+
+      #find four distances from combinations
+      distpp <- geosphere::distVincentyEllipsoid(loc1p, loc2p)
+      distpa <- geosphere::distVincentyEllipsoid(loc1p, loc2a)
+      distaa <- geosphere::distVincentyEllipsoid(loc1a, loc2a)
+      distap <- geosphere::distVincentyEllipsoid(loc1a, loc2p)
+
+      #create loc-strings
+      if (l1 == 1) { #if this is the first time through the loop create the first two elements of the loc-string
+        if (distpp <= distap) {
+          winstrp <- c('p', 'p')
+          windistp <- distpp
+        } else {
+          winstrp <- c('a', 'p')
+          windistp <- distap
+        }
+        if (distpa <= distaa) {
+          winstra <- c('p', 'a')
+          windista <- distpa
+        } else {
+          winstra <- c('a', 'a')
+          windista <- distaa
+        }
+      } else {
+        #find cumulative distances from the best tracks thus far
+        cumpp <- windistp + distpp
+        cumpa <- windistp + distpa
+        cumap <- windista + distap
+        cumaa <- windista + distaa
+
+        if (cumpp <= cumap) {
+          winstrp <- c(winstrp, 'p')
+          windistp <- cumpp
+        } else {
+          winstrp <- c(winstra, 'p')
+          windistp <- cumap
+        }
+        if (cumpa <= cumaa) {
+          winstra <- c(winstrp, 'a')
+          windista <- cumpa
+        } else {
+          winstra <- c(winstra, 'a')
+          windista <- cumaa
+        }
+      }
+
+      #go to next set of locs
+      l1 <- l2
+      l2 <- l1 + 1
+    }
+
+    #get shortest string
+    if (windistp < windista) {
+      winstring <- winstrp
+    } else {
+      winstring <- winstra
+    }
+
+    #go through argos dataframe and create lat and lon columns for the shortest path
+    for (r in 1:nrow(argos)) {
+      if (winstring[r] == 'p') {
+        argos$lat[r] <- argos$lat_p[r]
+        argos$lon[r] <- argos$lon_p[r]
+      } else {
+        argos$lat[r] <- argos$lat_a[r]
+        argos$lon[r] <- argos$lon_a[r]
+      }
+    }
+
+    #combine argos, user, and Zclass dataframes for next loop
+    if ((nrow(user_rows) > 0) & (nrow(Zclass) > 0)) {
+      argos <- rbind(argos, user_rows, Zclass)
+      argos <- argos[order(argos$datetime),]
+    } else {
+      if (nrow(user_rows) > 0) {
+        argos <- rbind(argos, user_rows)
+        argos <- argos[order(argos$datetime),]
+      } else {
+        if (nrow(Zclass) > 0) {
+          argos <- rbind(argos, Zclass)
+          argos <- argos[order(argos$datetime),]
+        }
+      }
+    }
+
+    #perform second pass with user and lc == Z rows included
+    if (length(which(is.na(argos$lat))) > 0) {
+      for (i in which(is.na(argos$lat))) {
+        loc_p <- c(argos$lon_p[i], argos$lat_p[i])
+        loc_a <- c(argos$lon_a[i], argos$lat_a[i])
+        if (i == 1) {
+          loc_after <- c(argos$lon[i+1], argos$lat[i+1])
+          distp_after <- geosphere::distVincentyEllipsoid(loc_p, loc_after)
+          dista_after <- geosphere::distVincentyEllipsoid(loc_a, loc_after)
+          if (distp_after <= dista_after) {
+            argos$lat[i] <- argos$lat_p[i]
+            argos$lon[i] <- argos$lon_p[i]
+          } else {
+            argos$lat[i] <- argos$lat_a[i]
+            argos$lon[i] <- argos$lon_a[i]
+          }
+        } else {
+          if (i == nrow(argos)) {
+            loc_before <- c(argos$lon[i-1], argos$lat[i-1])
+            distp_before <- geosphere::distVincentyEllipsoid(loc_p, loc_before)
+            dista_before <- geosphere::distVincentyEllipsoid(loc_a, loc_before)
+            if (distp_before <= dista_before) {
+              argos$lat[i] <- argos$lat_p[i]
+              argos$lon[i] <- argos$lon_p[i]
+            } else {
+              argos$lat[i] <- argos$lat_a[i]
+              argos$lon[i] <- argos$lon_a[i]
+            }
+          } else {
+            loc_before <- c(argos$lon[i-1], argos$lat[i-1])
+            distp_before <- geosphere::distVincentyEllipsoid(loc_p, loc_before)
+            dista_before <- geosphere::distVincentyEllipsoid(loc_a, loc_before)
+            loc_after <- c(argos$lon[i+1], argos$lat[i+1])
+            distp_after <- geosphere::distVincentyEllipsoid(loc_p, loc_after)
+            dista_after <- geosphere::distVincentyEllipsoid(loc_a, loc_after)
+            dp <- distp_before + distp_after
+            da <- dista_before + dista_after
+            if (dp <= da) {
+              argos$lat[i] <- argos$lat_p[i]
+              argos$lon[i] <- argos$lon_p[i]
+            } else {
+              argos$lat[i] <- argos$lat_a[i]
+              argos$lon[i] <- argos$lon_a[i]
+            }
+          }
+        }
+      }
     }
   }
 
@@ -123,7 +281,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
         stop('maxredun is a required input.')
       }
       if (is.null(keep_lc)) {
-        keep_lc <- 100000 #if NULL, keep_lc is huge so that no real lc can be greater than it
+        keep_lc <- 4 #if NULL, keep_lc is 4 so that only user given lcs are kept
       } else {
         if (is.character(keep_lc)) {
           if (keep_lc == 'Z') {
@@ -150,14 +308,14 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
       filt_rA <- FALSE
       while (rC <= nrow(argos)) {
         #find locations of three locations
-        locA <- c(argos$Longitude[rA], argos$Latitude[rA])
-        locB <- c(argos$Longitude[rB], argos$Latitude[rB])
-        locC <- c(argos$Longitude[rC], argos$Latitude[rC])
+        locA <- c(argos$lon[rA], argos$lat[rA])
+        locB <- c(argos$lon[rB], argos$lat[rB])
+        locC <- c(argos$lon[rC], argos$lat[rC])
 
         #calculate distances between three locations
-        distAB <- geosphere::distVincentySphere(locA, locB) / 1000
-        distBC <- geosphere::distVincentySphere(locB, locC) / 1000
-        distAC <- geosphere::distVincentySphere(locA, locC) / 1000
+        distAB <- geosphere::distVincentyEllipsoid(locA, locB) / 1000
+        distBC <- geosphere::distVincentyEllipsoid(locB, locC) / 1000
+        distAC <- geosphere::distVincentyEllipsoid(locA, locC) / 1000
 
         #mark the outlier location where necessary but keep locations that are good
         filtered[c(rA, rB, rC)] <- TRUE
@@ -199,7 +357,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
       argos$outlier <- filtered
 
       #force locations with lc >= keep_lc to be retained
-      argos$outlier[which(argos$Quality >= keep_lc)] <- FALSE
+      argos$outlier[which(argos$lc >= keep_lc)] <- FALSE
 
       #force last location to be retained if desired
       if (keeplast == TRUE) {
@@ -220,7 +378,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
         stop('minrate and ratecoef are required inputs for the DAR method.')
       }
       if (is.null(keep_lc)) {
-        keep_lc <- 100000 #if NULL, keep_lc is huge so that no real lc can be greater than it
+        keep_lc <- 4 #if NULL, keep_lc is 4 so that only user given lcs are kept
       } else {
         if (is.character(keep_lc)) {
           if (keep_lc == 'Z') {
@@ -254,10 +412,10 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
           #carry out steps
           #step 1
           #find locations of A and B
-          locA <- c(subargos$Longitude[rA], subargos$Latitude[rA])
-          locB <- c(subargos$Longitude[rB], subargos$Latitude[rB])
+          locA <- c(subargos$lon[rA], subargos$lat[rA])
+          locB <- c(subargos$lon[rB], subargos$lat[rB])
           #calculate AB distance
-          distAB <- geosphere::distVincentySphere(locA, locB) / 1000
+          distAB <- geosphere::distVincentyEllipsoid(locA, locB) / 1000
           if (distAB < maxredun) {
             subargos$outlier[rB] <- FALSE
             skip <- TRUE
@@ -265,7 +423,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
 
           #step 2
           if (skip == FALSE) {
-            if (subargos$Quality[rB] >= keep_lc) {
+            if (subargos$lc[rB] >= keep_lc) {
               subargos$outlier[rB] <- FALSE
               skip <- TRUE
             }
@@ -275,8 +433,8 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
           if (skip == FALSE) {
             if (r_only == FALSE) { #this step is only carried out if the input for r_only is FALSE
               #calculate alpha and minAlpha
-              locC <- c(subargos$Longitude[rC], subargos$Latitude[rC])
-              distBC <- geosphere::distVincentySphere(locB, locC) / 1000
+              locC <- c(subargos$lon[rC], subargos$lat[rC])
+              distBC <- geosphere::distVincentyEllipsoid(locB, locC) / 1000
               if ((distBC != 0) & (distAB != 0)) {
                 bearBA <- geosphere::bearing(locB, locA)
                 if (bearBA < 0) {
@@ -299,7 +457,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
           #step 4
           if (skip == FALSE) {
             #find rate from A to B
-            hours <- (as.numeric(subargos$Date[rB]) - as.numeric(subargos$Date[rA])) / 60 / 60
+            hours <- (as.numeric(subargos$datetime[rB]) - as.numeric(subargos$datetime[rA])) / 60 / 60
             rateAB <- distAB / hours
             if (rateAB > minrate) {
               subargos$outlier[rB] <- TRUE
@@ -311,19 +469,19 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
           if (skip == FALSE) {
             if (iteration == 5) {
               #find rate from B to C and calculate distBD and distCD
-              hours <- (as.numeric(subargos$Date[rC]) - as.numeric(subargos$Date[rB])) / 60 / 60
+              hours <- (as.numeric(subargos$datetime[rC]) - as.numeric(subargos$datetime[rB])) / 60 / 60
               rateBC <- distBC / hours
               if (rateBC > minrate) {
                 subargos$outlier[rB] <- TRUE
               }
             } else {
               #find rate from B to C and calculate distBD and distCD
-              hours <- (as.numeric(subargos$Date[rC]) - as.numeric(subargos$Date[rB])) / 60 / 60
+              hours <- (as.numeric(subargos$datetime[rC]) - as.numeric(subargos$datetime[rB])) / 60 / 60
               rateBC <- distBC / hours
-              locD <- c(subargos$Longitude[rD], subargos$Latitude[rD])
-              distAC <- geosphere::distVincentySphere(locA, locC) / 1000
-              distBD <- geosphere::distVincentySphere(locB, locD) / 1000
-              distCD <- geosphere::distVincentySphere(locC, locD) / 1000
+              locD <- c(subargos$lon[rD], subargos$lat[rD])
+              distAC <- geosphere::distVincentyEllipsoid(locA, locC) / 1000
+              distBD <- geosphere::distVincentyEllipsoid(locB, locD) / 1000
+              distCD <- geosphere::distVincentyEllipsoid(locC, locD) / 1000
               if ((rateBC > minrate) & ((distAB + distBD) > (distAC + distCD))) {
                 subargos$outlier[rB] <- TRUE
               }
@@ -352,7 +510,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
           if (is.na(subargos$outlier[i])) {
             subargos$outlier[i] <- FALSE
           }
-          argos$outlier[which(argos$Date == subargos$Date[i])] <- subargos$outlier[i]
+          argos$outlier[which(argos$datetime == subargos$datetime[i])] <- subargos$outlier[i]
         }
         subargos <- subargos[which(subargos$outlier == FALSE),]
 
@@ -394,10 +552,10 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
   if (best_of_day == TRUE) {
     stop('best-of-day filtering is only set up for data for LS filtered argos inputs, and thus not working now')
     if (is.null(minoffh)) {
-      for (m in unique(lubridate::month(argos$Date))) {
-        margos <- argos[which(lubridate::month(argos$Date) == m),] #all rows from the given month
-        for (d in unique(lubridate::day(margos$Date))) {
-          mdargos <- margos[which(lubridate::month(margos$Date) == d),] #all rows from a given day in that month
+      for (m in unique(lubridate::month(argos$datetime))) {
+        margos <- argos[which(lubridate::month(argos$datetime) == m),] #all rows from the given month
+        for (d in unique(lubridate::day(margos$datetime))) {
+          mdargos <- margos[which(lubridate::month(margos$datetime) == d),] #all rows from a given day in that month
           if (nrow(mdargos) == 1) { #if only one row exists, that is the best
             retained <- rbind(retained, mdargos)
             next
@@ -407,7 +565,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
           } else {
             if (rankmeth == 1) { #lc, iqx, iqy, nbmes
               #lc
-              new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
+              new_mdargos <- mdargos[which(mdargos$lc == max(mdargos$lc)),]
               if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_mdargos)
                 next
@@ -435,7 +593,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
             } else {
               if (rankmeth == 2) { #lc, iqx, nbmes, iqy
                 #lc
-                new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
+                new_mdargos <- mdargos[which(mdargos$lc == max(mdargos$lc)),]
                 if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_mdargos)
                   next
@@ -463,7 +621,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
               } else {
                 if (rankmeth == 3) { #lc, nbmes
                   #lc
-                  new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
+                  new_mdargos <- mdargos[which(mdargos$lc == max(mdargos$lc)),]
                   if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                     retained <- rbind(retained, new_mdargos)
                     next
@@ -489,7 +647,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
       #loop through argos locations and place locations in respective list elements
       for (l in 1:(nrow(argos) - 1)) {
         #calculate change in time between consecutive locations
-        dt <- difftime(argos$Date[(l+1)], argos$Date[l], units = 'hours')
+        dt <- difftime(argos$datetime[(l+1)], argos$datetime[l], units = 'hours')
 
         #if time between next location and current location is greater than the minoffh,
         #   then add the next location to the next duty cycle list element, otherwise
@@ -516,7 +674,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
         } else {
           if (rankmeth == 1) { #lc, iqx, iqy, nbmes
             #lc
-            new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
+            new_argos <- new_argos[which(new_argos$lc == max(new_argos$lc)),]
             if (nrow(new_argos) == 1) { #if only one row exists, that is the best
               retained <- rbind(retained, new_argos)
               next
@@ -544,7 +702,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
           } else {
             if (rankmeth == 2) { #lc, iqx, nbmes, iqy
               #lc
-              new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
+              new_argos <- new_argos[which(new_argos$lc == max(new_argos$lc)),]
               if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_argos)
                 next
@@ -572,7 +730,7 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
             } else {
               if (rankmeth == 3) { #lc, nbmes
                 #lc
-                new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
+                new_argos <- new_argos[which(new_argos$lc == max(new_argos$lc)),]
                 if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_argos)
                   next
@@ -595,13 +753,11 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
 
   #remove outliers from retained data and create combined dataframe and make sure user locations are kept in retained
   for (i in 1:nrow(argos)) {
-    if (argos$Date[i] %in% retained$Date == FALSE) {
+    if (argos$datetime[i] %in% retained$datetime == FALSE) {
       argos$outlier[i] <- TRUE
     }
   }
   outliers <- rbind(outliers, argos[which(argos$outlier == TRUE),])
-  outliers <- outliers[which(outliers$Type != 'User'),]
-  retained <- retained[which(retained$Type != 'User'),]
   if (nrow(user) > 0) {
     retained <- rbind(retained, user)
   }
@@ -609,41 +765,42 @@ douglasfilt <- function(argos, method, keep_lc = NULL, maxredun = NULL, duplrec 
   #revert lc to characters
   if (nrow(retained) > 0) {
     for (r in 1:nrow(retained)) {
-      if (retained$Type[r] == 'User') {
-        retained$Quality[r] <- 'User'
+      if (retained$lc[r] == 4) {
+        retained$lc[r] <- 'User'
       }
-      if (retained$Quality[r] == -3) {
-        retained$Quality[r] <- 'Z'
+      if (retained$lc[r] == -3) {
+        retained$lc[r] <- 'Z'
       }
-      if (retained$Quality[r] == -2) {
-        retained$Quality[r] <- 'B'
+      if (retained$lc[r] == -2) {
+        retained$lc[r] <- 'B'
       }
-      if (retained$Quality[r] == -1) {
-        retained$Quality[r] <- 'A'
+      if (retained$lc[r] == -1) {
+        retained$lc[r] <- 'A'
       }
     }
   }
   if (nrow(outliers) > 0) {
     for (r in 1:nrow(outliers)) {
-      if (outliers$Quality[r] == -3) {
-        outliers$Quality[r] <- 'Z'
+      if (outliers$lc[r] == -3) {
+        outliers$lc[r] <- 'Z'
       }
-      if (outliers$Quality[r] == -2) {
-        outliers$Quality[r] <- 'B'
+      if (outliers$lc[r] == -2) {
+        outliers$lc[r] <- 'B'
       }
-      if (outliers$Quality[r] == -1) {
-        outliers$Quality[r] <- 'A'
+      if (outliers$lc[r] == -1) {
+        outliers$lc[r] <- 'A'
       }
     }
   }
+  outliers <- outliers[which(outliers$lc != 4)]
 
   #create dataframe with all argos locations
   all <- rbind(outliers, retained)
 
   #order data by datetime column
-  outliers <- outliers[order(outliers$Date),]
-  retained <- retained[order(retained$Date),]
-  all <- all[order(all$Date),]
+  outliers <- outliers[order(outliers$datetime),]
+  retained <- retained[order(retained$datetime),]
+  all <- all[order(all$datetime),]
 
   #return list of all, retained, and outliers
   return(list(all = all, retained = retained, outliers = outliers))
