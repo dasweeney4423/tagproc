@@ -1,3 +1,25 @@
+#' Format time data
+#'
+#' This function formats time data from many formats into a single standard format that is used by other tools in this package
+#' @param dt The vector of times to be reformatted
+#' @return A list of 10 elements:
+#' \itemize{
+#' \item{\strong{raw: Datetime vector NOT strptime'd.}}
+#' \item{\strong{yearfirst: Datetime vector that has NOT been strptime'd, but has the year come first instead of month.}}
+#' \item{\strong{strp: Datetime vector that HAS been strptime'd.}}
+#' \item{\strong{mm: Vector of months.}}
+#' \item{\strong{dd: Vector of days.}}
+#' \item{\strong{yyyy: Vector of years.}}
+#' \item{\strong{hh: Vector of hours.}}
+#' \item{\strong{min: Vector of minutes.}}
+#' \item{\strong{ss: Vector of seconds.}}
+#' \item{\strong{j: Vector of julian days (001-366).}}
+#' }
+#' @note Time turner rules: Date and time have to be in the same vector. If they occur in two different columns in your data, you must concatenate them with paste() function. Date and time must be separated by a space. Date info must be delineated by a - , / , or d. Time info must be delineated with a :. If time data does not have seconds information, ":00" will be assumed for every entry.
+#' @export
+#' @examples #example not yet provided, sorry :(
+
+
 time.turner <- function(dt) {
   # Test to see if dt is already in correct format
   dt <- as.character(dt)

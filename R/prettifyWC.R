@@ -1,3 +1,11 @@
+#' Prettify files in the WC portal folder
+#'
+#' Copies WC portal data to a new folder and formats column names and date/time information in the process. All other data analyses will require these column headers.
+#' @param WCfolder A file path to the WC portal folder with the tag data.
+#' @return Once finished, a new folder names "WC-pretty" will be created within the folder specified by the input of 'WCfolder' in which all new data CSV files will be placed.
+#' @export
+#' @examples prettifyWC("WhaleTag001/WCPortal")
+
 prettifyWC <- function(WCfolder) {
   #get files in WC-portal folder
   lf <- list.files(WCfolder)
