@@ -122,8 +122,8 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     Zclass$Latitude <- NA
     Zclass$Longitude <- NA
     user_rows <- argos[which(argos$LocationQuality == -4),]
-    user_rows$Latitude <- user_rows$Latitude_p
-    user_rows$Longitude <- user_rows$Longitude_p
+    user_rows$Latitude <- user_rows$Latitude_Prim
+    user_rows$Longitude <- user_rows$Longitude_Prim
     argos <- argos[which(argos$LocationQuality != -3),]
 
     #create starting locations and distances/loc-strings
@@ -131,10 +131,10 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     l2 <- l1 + 1
     while (l2 <= nrow(argos)) {
       #get locations
-      loc1p <- c(argos$Longitude_p[l1], argos$Latitude_p[l1])
-      loc1a <- c(argos$Longitude_a[l1], argos$Latitude_a[l1])
-      loc2p <- c(argos$Longitude_p[l2], argos$Latitude_p[l2])
-      loc2a <- c(argos$Longitude_a[l2], argos$Latitude_a[l2])
+      loc1p <- c(argos$Longitude_Prim[l1], argos$Latitude_Prim[l1])
+      loc1a <- c(argos$Longitude_Alt[l1], argos$Latitude_Alt[l1])
+      loc2p <- c(argos$Longitude_Prim[l2], argos$Latitude_Prim[l2])
+      loc2a <- c(argos$Longitude_Alt[l2], argos$Latitude_Alt[l2])
 
       #find four distances from combinations
       distpp <- geosphere::distVincentyEllipsoid(loc1p, loc2p)
@@ -196,11 +196,11 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     #go through argos dataframe and create lat and lon columns for the shortest path
     for (r in 1:nrow(argos)) {
       if (winstring[r] == 'p') {
-        argos$Latitude[r] <- argos$Latitude_p[r]
-        argos$Longitude[r] <- argos$Longitude_p[r]
+        argos$Latitude[r] <- argos$Latitude_Prim[r]
+        argos$Longitude[r] <- argos$Longitude_Prim[r]
       } else {
-        argos$Latitude[r] <- argos$Latitude_a[r]
-        argos$Longitude[r] <- argos$Longitude_a[r]
+        argos$Latitude[r] <- argos$Latitude_Alt[r]
+        argos$Longitude[r] <- argos$Longitude_Alt[r]
       }
     }
 
@@ -223,18 +223,18 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     #perform second pass with user and lc == Z rows included
     if (length(which(is.na(argos$Latitude))) > 0) {
       for (i in which(is.na(argos$Latitude))) {
-        loc_p <- c(argos$Longitude_p[i], argos$Latitude_p[i])
-        loc_a <- c(argos$Longitude_a[i], argos$Latitude_a[i])
+        loc_p <- c(argos$Longitude_Prim[i], argos$Latitude_Prim[i])
+        loc_a <- c(argos$Longitude_Alt[i], argos$Latitude_Alt[i])
         if (i == 1) {
           loc_after <- c(argos$Longitude[i+1], argos$Latitude[i+1])
           distp_after <- geosphere::distVincentyEllipsoid(loc_p, loc_after)
           dista_after <- geosphere::distVincentyEllipsoid(loc_a, loc_after)
           if (distp_after <= dista_after) {
-            argos$Latitude[i] <- argos$Latitude_p[i]
-            argos$Longitude[i] <- argos$Longitude_p[i]
+            argos$Latitude[i] <- argos$Latitude_Prim[i]
+            argos$Longitude[i] <- argos$Longitude_Prim[i]
           } else {
-            argos$Latitude[i] <- argos$Latitude_a[i]
-            argos$Longitude[i] <- argos$Longitude_a[i]
+            argos$Latitude[i] <- argos$Latitude_Alt[i]
+            argos$Longitude[i] <- argos$Longitude_Alt[i]
           }
         } else {
           if (i == nrow(argos)) {
@@ -242,11 +242,11 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             distp_before <- geosphere::distVincentyEllipsoid(loc_p, loc_before)
             dista_before <- geosphere::distVincentyEllipsoid(loc_a, loc_before)
             if (distp_before <= dista_before) {
-              argos$Latitude[i] <- argos$Latitude_p[i]
-              argos$Longitude[i] <- argos$Longitude_p[i]
+              argos$Latitude[i] <- argos$Latitude_Prim[i]
+              argos$Longitude[i] <- argos$Longitude_Prim[i]
             } else {
-              argos$Latitude[i] <- argos$Latitude_a[i]
-              argos$Longitude[i] <- argos$Longitude_a[i]
+              argos$Latitude[i] <- argos$Latitude_Alt[i]
+              argos$Longitude[i] <- argos$Longitude_Alt[i]
             }
           } else {
             loc_before <- c(argos$Longitude[i-1], argos$Latitude[i-1])
@@ -258,11 +258,11 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             dp <- distp_before + distp_after
             da <- dista_before + dista_after
             if (dp <= da) {
-              argos$Latitude[i] <- argos$Latitude_p[i]
-              argos$Longitude[i] <- argos$Longitude_p[i]
+              argos$Latitude[i] <- argos$Latitude_Prim[i]
+              argos$Longitude[i] <- argos$Longitude_Prim[i]
             } else {
-              argos$Latitude[i] <- argos$Latitude_a[i]
-              argos$Longitude[i] <- argos$Longitude_a[i]
+              argos$Latitude[i] <- argos$Latitude_Alt[i]
+              argos$Longitude[i] <- argos$Longitude_Alt[i]
             }
           }
         }
