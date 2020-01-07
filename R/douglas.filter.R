@@ -5,20 +5,20 @@
 #' @param argos_method A string specifying the data is from CLS' least-squared method (input == 'LS') or from the Kalman method (input == 'K').
 #' @param method A string specifying the desired Douglas Argos-filtering method to be used. Options include 'MRD', 'DAR', or 'HYB'.
 #' @param keep_lc The lc for which argos locations equal to or better than are retained according to the filtering method specified. If not specified, no argos locations are unconditionally kept because of their lc.
-#' @param maxredun A required input for all filtering methods. This variable (units = km) is used to filter the Argos locations such that every retained location has a temporally near-consecutive location that is spatially within the defined distance. See the following notes for more information on how this input is used differently in each filtering method.
+#' @param maxredun A required input for all filtering methods. This variable (units = km) is used to filter the Argos locations such that every retained location has a temporally neear-consecutive location that is spatially within the defined distance. See the following notes for more information on how this input is used differently in each filtering method.
 #' @param duplrec A string specifying what to do in the cases where two argos locations have the same time stamp. If the input is 'offset' (default), then replicate times are offset by one second. If the input is 'filter', then replicates are marked as outliers and removed from the data before filtering.
 #' @param keeplast Logical. An input only required if using the MRD or HYB filtering method. If FALSE (default), the last argos location is not unconditionally retained during filtering. If TRUE, the last argos location is unconditionally retained regardless of whether or not is passes the other filtering requirements.
 #' @param skiploc Logical. An input only required if using the MRD or HYB filtering method. If FALSE (default), locations that are initially marked as an outlier are retested in the following round and have the chance of being retained if passing the second round of testing. If FALSE, locations that are initially marked as outliers are not retested and remain listed as an outlier.
 #' @param minrate An input only required if using the DAR or HYB filtering method. minrate (units = km/hr) should reflect an upper bound of sustainable movement rate over a period of hours, including potential assistance by winds or currents.
 #' @param ratecoef An input only required if using the DAR or HYB filtering method. A constant used to set the minimum allowed angle between three locations. Larger values for ratecoef will be less tolerant of acute turning angles; choices are typically between 15 and 25.
 #' @param r_only Logical. An input only required if using the DAR or HYB filtering method. If TRUE, then the test to see if the angle between three locations is less than the minimum allowed angle is skipped. If FALSE (default), this angle test is included in the filtering process.
-#' @param xmigrate An input only required if using the HYB filtering method.
-#' @param xoverrun An input only required if using the HYB filtering method.
-#' @param xdirect An input only required if using the HYB filtering method.
-#' @param xangle An input only required if using the HYB filtering method.
-#' @param xpercent An input only required if using the HYB filtering method.
-#' @param testp_0a An input only required if using the HYB filtering method.
-#' @param testp_bz An input only required if using the HYB filtering method.
+#' @param xmigrate An input only required if using the HYB filtering method. This input is used to determine if migration events occurred between two consecutive locations that both passed the MRD filter and that have at least one locations that passed the DAR filter in between them. A migration event is said to occur if the distance between the two MRD-retained locations exceeds this input (xmigrate) multiplied by maxredun.
+#' @param xoverrun An input only required if using the HYB filtering method. If a migration event is determined, this input is used to test all intervening locations. The distance between the starting location of the migration and each intervening location must be less than the distance between the start location and the end location of the migration plus xoverrun times maxredun. If this test is TRUE, three more tests are performed to see if the DAR-retained intervening locations should be retained.
+#' @param xdirect An input only required if using the HYB filtering method. Used to test the directional deviation of a location during a determined migration event. The heading from the starting location of the migration to a location along the migration path must be within +/- xdirect degrees of the heading of the vector from the starting migration location to the end location of the migration.
+#' @param xangle An input only required if using the HYB filtering method. Used to test the angular deviation of a location during a determined migration event. The angle formed between the start, intervening, and ending  location of a migration event must exceed xangle degrees.
+#' @param xpercent An input only required if using the HYB filtering method. Used to test the distance deviation of a location during a determined migration event. The total length between the start and intervening migration locations and the intervening and end migrations locations must not exceed the length of just the start and end migration locations by more than xpercent percentage.
+#' @param test_0a An input only required if using the HYB filtering method. If the location quality for an intervening location during a migration event is A or better, test_0a number of tests (see most recent inputs) need to be passed for the location to be retained.
+#' @param test_bz An input only required if using the HYB filtering method.If the location quality for an intervening location during a migration event is Z or B, test_bz number of tests (see most recent inputs) need to be passed for the location to be retained.
 #' @param best_of_day Logical. If TRUE, an additional filtering process is carried out the only retains the "best location of the day" according to the method specified by the input rankmeth. Default is FALSE.
 #' @param minoffh An input only required if best_of_day is TRUE and if you desire to filter according to PTT duty cycles rather than by GMT days. This input (units = hours) should be a little bit greater than the minimum OFF duration of the duty cycle and a little bit less than the maximum ON duration of the duty cycle. See the notes section for more information about how to properly set this input.
 #' @param rankmeth An input only required if best_of_day is TRUE. The best location for the given cluster (GMT day or duty cycle depending on if minoffh is specified or not) is chosen by the following hierarchy of DIAG variables. For an input of 1 (default): lc, iqx, iqy, and nbmes. For an input of 2: lc, iqx, nbmes, and iqy. For an input of 3: lc and nbmes. As the cluster of locations passes through each DIAG variable test, the location with the highest values according to the hierachy is retained and all other locations in that cluster are filtered out.
@@ -35,12 +35,15 @@
 douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun = NULL, duplrec = 'offset', #inputs required by all filtering methods
                            keeplast = FALSE, skiploc = FALSE, #inputs for MRD filter
                            minrate = NULL, ratecoef = NULL, r_only = FALSE, #inputs for DAR filter
-                           xmigrate = NULL, xoverrun = NULL, xdirect = NULL, xangle = NULL, xpercent = NULL, testp_0a = NULL, testp_bz = NULL, #inputs for Best Hybrid filter
+                           xmigrate = NULL, xoverrun = NULL, xdirect = NULL, xangle = NULL, xpercent = NULL, test_0a = NULL, test_bz = NULL, #inputs for Best Hybrid filter
                            best_of_day = FALSE, minoffh = NULL, rankmeth = 1 #inputs for Best of Day post-filtering
 ) {
   #input checks
   if ((method != 'HYB') & (method != 'DAR') & (method != 'MRD')) {
     stop('Invalid input for method. Valid options are MRD, DAR, or HYB')
+  }
+  if (argos_method %in% c('LS', 'K') == FALSE) {
+    stop('Invalid input for argos_method. Valid options are LS or K')
   }
   if (!is.data.frame(argos)) {
     stop('Input for argos must be a dataframe')
@@ -56,26 +59,26 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   if ('POSIXct' %in% class(argos$Date) == FALSE) {
     argos$Date <- as.POSIXct(as.character(argos$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
   }
-  argos$LocationQuality <- as.character(argos$LocationQuality)
+  argos$Quality <- as.character(argos$Quality)
 
   #temporarily change lc letters to numbers to allow for easier comparison
   user <- data.frame()
   for (r in 1:nrow(argos)) {
-    if (argos$LocationQuality[r] %in% c('User', 'DP')) {
+    if (argos$Quality[r] %in% c('User', 'DP')) {
       user <- rbind(user, argos[r,]) #pull out user defined locations to ensure they are kept after filtering
-      argos$LocationQuality[r] <- 4
+      argos$Quality[r] <- 4
     }
-    if (argos$LocationQuality[r] == 'Z') {
-      argos$LocationQuality[r] <- -3
+    if (argos$Quality[r] == 'Z') {
+      argos$Quality[r] <- -3
     }
-    if (argos$LocationQuality[r] == 'B') {
-      argos$LocationQuality[r] <- -2
+    if (argos$Quality[r] == 'B') {
+      argos$Quality[r] <- -2
     }
-    if (argos$LocationQuality[r] == 'A') {
-      argos$LocationQuality[r] <- -1
+    if (argos$Quality[r] == 'A') {
+      argos$Quality[r] <- -1
     }
   }
-  argos$LocationQuality <- as.numeric(argos$LocationQuality)
+  argos$Quality <- as.numeric(argos$Quality)
   if (nrow(user) > 0) {
     user$outlier <- FALSE
   }
@@ -118,23 +121,23 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
 
   #find best of primary and alternate locations if data in least-squares argos locations
   if (argos_method == 'LS') {
-    Zclass <- argos[which(argos$LocationQuality == -3),]
+    Zclass <- argos[which(argos$Quality == -3),]
     Zclass$Latitude <- NA
     Zclass$Longitude <- NA
-    user_rows <- argos[which(argos$LocationQuality == -4),]
-    user_rows$Latitude <- user_rows$Latitude_Prim
-    user_rows$Longitude <- user_rows$Longitude_Prim
-    argos <- argos[which(argos$LocationQuality != -3),]
+    user_rows <- argos[which(argos$Quality == -4),]
+    user_rows$Latitude <- user_rows$Latitude_p
+    user_rows$Longitude <- user_rows$Longitude_p
+    argos <- argos[which(argos$Quality != -3),]
 
     #create starting locations and distances/loc-strings
     l1 <- 1
     l2 <- l1 + 1
     while (l2 <= nrow(argos)) {
       #get locations
-      loc1p <- c(argos$Longitude_Prim[l1], argos$Latitude_Prim[l1])
-      loc1a <- c(argos$Longitude_Alt[l1], argos$Latitude_Alt[l1])
-      loc2p <- c(argos$Longitude_Prim[l2], argos$Latitude_Prim[l2])
-      loc2a <- c(argos$Longitude_Alt[l2], argos$Latitude_Alt[l2])
+      loc1p <- c(argos$Longitude_p[l1], argos$Latitude_p[l1])
+      loc1a <- c(argos$Longitude_a[l1], argos$Latitude_a[l1])
+      loc2p <- c(argos$Longitude_p[l2], argos$Latitude_p[l2])
+      loc2a <- c(argos$Longitude_a[l2], argos$Latitude_a[l2])
 
       #find four distances from combinations
       distpp <- geosphere::distVincentyEllipsoid(loc1p, loc2p)
@@ -196,11 +199,11 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     #go through argos dataframe and create lat and lon columns for the shortest path
     for (r in 1:nrow(argos)) {
       if (winstring[r] == 'p') {
-        argos$Latitude[r] <- argos$Latitude_Prim[r]
-        argos$Longitude[r] <- argos$Longitude_Prim[r]
+        argos$Latitude[r] <- argos$Latitude_p[r]
+        argos$Longitude[r] <- argos$Longitude_p[r]
       } else {
-        argos$Latitude[r] <- argos$Latitude_Alt[r]
-        argos$Longitude[r] <- argos$Longitude_Alt[r]
+        argos$Latitude[r] <- argos$Latitude_a[r]
+        argos$Longitude[r] <- argos$Longitude_a[r]
       }
     }
 
@@ -223,18 +226,18 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     #perform second pass with user and lc == Z rows included
     if (length(which(is.na(argos$Latitude))) > 0) {
       for (i in which(is.na(argos$Latitude))) {
-        loc_p <- c(argos$Longitude_Prim[i], argos$Latitude_Prim[i])
-        loc_a <- c(argos$Longitude_Alt[i], argos$Latitude_Alt[i])
+        loc_p <- c(argos$Longitude_p[i], argos$Latitude_p[i])
+        loc_a <- c(argos$Longitude_a[i], argos$Latitude_a[i])
         if (i == 1) {
           loc_after <- c(argos$Longitude[i+1], argos$Latitude[i+1])
           distp_after <- geosphere::distVincentyEllipsoid(loc_p, loc_after)
           dista_after <- geosphere::distVincentyEllipsoid(loc_a, loc_after)
           if (distp_after <= dista_after) {
-            argos$Latitude[i] <- argos$Latitude_Prim[i]
-            argos$Longitude[i] <- argos$Longitude_Prim[i]
+            argos$Latitude[i] <- argos$Latitude_p[i]
+            argos$Longitude[i] <- argos$Longitude_p[i]
           } else {
-            argos$Latitude[i] <- argos$Latitude_Alt[i]
-            argos$Longitude[i] <- argos$Longitude_Alt[i]
+            argos$Latitude[i] <- argos$Latitude_a[i]
+            argos$Longitude[i] <- argos$Longitude_a[i]
           }
         } else {
           if (i == nrow(argos)) {
@@ -242,11 +245,11 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             distp_before <- geosphere::distVincentyEllipsoid(loc_p, loc_before)
             dista_before <- geosphere::distVincentyEllipsoid(loc_a, loc_before)
             if (distp_before <= dista_before) {
-              argos$Latitude[i] <- argos$Latitude_Prim[i]
-              argos$Longitude[i] <- argos$Longitude_Prim[i]
+              argos$Latitude[i] <- argos$Latitude_p[i]
+              argos$Longitude[i] <- argos$Longitude_p[i]
             } else {
-              argos$Latitude[i] <- argos$Latitude_Alt[i]
-              argos$Longitude[i] <- argos$Longitude_Alt[i]
+              argos$Latitude[i] <- argos$Latitude_a[i]
+              argos$Longitude[i] <- argos$Longitude_a[i]
             }
           } else {
             loc_before <- c(argos$Longitude[i-1], argos$Latitude[i-1])
@@ -258,11 +261,11 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             dp <- distp_before + distp_after
             da <- dista_before + dista_after
             if (dp <= da) {
-              argos$Latitude[i] <- argos$Latitude_Prim[i]
-              argos$Longitude[i] <- argos$Longitude_Prim[i]
+              argos$Latitude[i] <- argos$Latitude_p[i]
+              argos$Longitude[i] <- argos$Longitude_p[i]
             } else {
-              argos$Latitude[i] <- argos$Latitude_Alt[i]
-              argos$Longitude[i] <- argos$Longitude_Alt[i]
+              argos$Latitude[i] <- argos$Latitude_a[i]
+              argos$Longitude[i] <- argos$Longitude_a[i]
             }
           }
         }
@@ -271,12 +274,29 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   }
 
   ###############################################################################
+  #######################internal angle function#################################
+  ###############################################################################
+
+  int_ang <- function (locA, locB, locC) {
+    bearBA <- geosphere::bearing(locB, locA)
+    if (bearBA < 0) {
+      bearBA <- 180 + (180 - abs(bearBA))
+    }
+    bearBC <- geosphere::bearing(locB, locC)
+    if (bearBC < 0) {
+      bearBC <- 180 + (180 - abs(bearBC))
+    }
+    alpha <- max(c(bearBA, bearBC)) - min(c(bearBA, bearBC))
+    return(alpha)
+  }
+
+  ###############################################################################
   ###############################methods#########################################
   ###############################################################################
 
   #run MRD filtering method
   if ((method == 'MRD') | (method == 'HYB')) {
-    MRD <- function(argos, maxredun, keep_lc) {
+    MRD <- function(argos, maxredun, keep_lc, keeplast, skiploc) {
       if (is.null(maxredun)) {
         stop('maxredun is a required input.')
       }
@@ -357,7 +377,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
       argos$outlier <- filtered
 
       #force locations with lc >= keep_lc to be retained
-      argos$outlier[which(argos$LocationQuality >= keep_lc)] <- FALSE
+      argos$outlier[which(argos$Quality >= keep_lc)] <- FALSE
 
       #force last location to be retained if desired
       if (keeplast == TRUE) {
@@ -423,7 +443,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
 
           #step 2
           if (skip == FALSE) {
-            if (subargos$LocationQuality[rB] >= keep_lc) {
+            if (subargos$Quality[rB] >= keep_lc) {
               subargos$outlier[rB] <- FALSE
               skip <- TRUE
             }
@@ -436,16 +456,8 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               locC <- c(subargos$Longitude[rC], subargos$Latitude[rC])
               distBC <- geosphere::distVincentyEllipsoid(locB, locC) / 1000
               if ((distBC != 0) & (distAB != 0)) {
-                bearBA <- geosphere::bearing(locB, locA)
-                if (bearBA < 0) {
-                  bearBA <- 180 + (180 - abs(bearBA))
-                }
-                bearBC <- geosphere::bearing(locB, locC)
-                if (bearBC < 0) {
-                  bearBC <- 180 + (180 - abs(bearBC))
-                }
-                alpha <- max(c(bearBA, bearBC)) - min(c(bearBA, bearBC))
-                minAlpha <- -25 + ratecoef * log(min(distAB, distBC))
+                alpha <- int_ang(locA, locB, locC) #see above for code
+                minAlpha <- abs(-25 + ratecoef * log(min(distAB, distBC)))
                 if (alpha < minAlpha) {
                   subargos$outlier[rB] <- TRUE
                   skip <- TRUE
@@ -523,33 +535,125 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   }
 
   if (method == 'HYB') {
-    HYB <- function() {
-      stop('HYB filter not completed yet')
+    HYB <- function(argos, keep_lc, maxredun,
+                    keeplast, skiploc, #inputs for MRD filter
+                    minrate, ratecoef, r_only, #inputs for DAR filter
+                    xmigrate, xoverrun, xdirect, xangle, xpercent, test_0a, test_bz) { #inputs for HYB filter
+
+      #first run MRD filter and retain these locations unconditionally
+      mrd_retained <- MRD(argos, maxredun, keep_lc, keeplast, skiploc)
+      mrd_retained <- mrd_retained[which(mrd_retained$outlier == FALSE),]
+      mrd_retained$method <- 'MRD'
+
+      #then run DAR filter
+      dar_retained <- DAR(argos, maxredun, ratecoef, minrate, keep_lc)
+      dar_retained <- dar_retained[which(dar_retained$outlier == FALSE),]
+      dar_retained$method <- 'DAR'
+
+      #create full dataset
+      ret <- rbind(dar_retained, mrd_retained)
+      ret <- ret[order(ret$Date),]
+      data <- data.frame()
+      for (t in unique(ret$Date)) { #remove duplicate times that were saved by both filter methods
+        dt <- ret[which(ret$Date == t),]
+        if (nrow(dt) > 1) {
+          data <- rbind(data, dt[which(dt$method == 'MRD'),])
+        } else {
+          data <- rbind(data, dt)
+        }
+      }
+
+      #find start and end cues of possible migrations
+      wmrd <- which(data$method=='MRD')
+      dw <- diff(wmrd)
+      migstart <- wmrd[which(dw > 1)] #data row at start of possible migration
+      migend <- c()
+      for (i in wmrd) { #data row at end of possible migration
+        if (i %in% migrows) {
+          migend <- c(migend, wmrd[which(wmrd == i) + 1])
+        }
+      }
+
+      #determine if possible migrations are indeed migrations
+      for (m in 1:length(migstart)) {
+        s <- migstart[m]
+        e <- migend[m]
+        locstart <- c(data$Longitude[s], data$Latitude[s])
+        locend <- c(data$Longitude[e], data$Latitude[e])
+        migdist <- geosphere::distVincentyEllipsoid(locstart, locend) / 1000 #distance from start to end of possible migration
+        if (migdist > (xmigrate * maxredun)) { #if TRUE, migration event occurred and now test all DAR lcoations in between
+          #distance between Xo and Xn-1 must be less than the distance between Xo and Xn + xoverrun*maxredun
+          locDARend <- c(data$Longitude[e-1], data$Latitude[e-1])
+          distDAR <- geosphere::distVincentyEllipsoid(locstart, locDARend) / 1000 #distance between Xo and Xn-1
+          if (distDAR < (migdist + xoverrun * maxredun)) { #if TRUE, three more tests are performed
+            data$ndev <- 0
+            for (i in (s + 1):(e - 1)) {
+              loci <- c(data$Longitude[i], data$Latitude[i])
+              #test 1: directional deviation
+              beari <- geosphere::bearing(locstart, loci)
+              bearse <- geosphere::bearing(locstart, locend)
+              #the heading of the vector Xo-Xi must be within ±xdirect degrees of the heading of the vector Xo-Xn
+              if (abs(beari - bearse) <= xdirect) {
+                data$ndev[i] <- data$ndev[i] + 1
+              }
+
+              #test 2: angular deviation
+              devang <- int_ang(locstart, loci, locend) #see above for code
+              #the angle formed by Xo-Xi-Xn must exceed XANGLE degrees
+              if (devang > xangle) {
+                data$ndev[i] <- data$ndev[i] + 1
+              }
+
+              #test 3: distance deviation
+              distsi <- geosphere::distVincentyEllipsoid(locstart, loci) / 1000
+              distie <- geosphere::distVincentyEllipsoid(loci, locend) / 1000
+              tdist <- distsi + distie
+              #the length of Xo-Xi-Xn must not exceed the length of Xo-Xn by more than xpercent
+              if (tdist <= (migdist + (migdist * xpercent))) {
+                data$ndev[i] <- data$ndev[i] + 1
+              }
+
+              #retain or filter based on lc and other inputs
+              if (data$Quality[i] %in% c(-3, -2)) {
+                if (data$ndev[i] >= test_bz) {
+                  data$outlier[i] <- FALSE
+                }
+              } else {
+                if (data$ndev[i] >= test_0a) {
+                  data$outlier[i] <- FALSE
+                }
+              }
+            }
+          }
+        }
+      }
+
+      argos <- data[,c(1:21)]
+      return(argos)
     }
   }
 
   ###############################################################################
-  ###############################################################################
+  ####################run filters and perform BOD if desired#####################
   ###############################################################################
 
   #run MRD
   if (method == 'MRD') {
-    argos <- MRD(argos, maxredun, keep_lc)
+    argos <- MRD(argos, maxredun, keep_lc, keeplast, skiploc)
   } else {
     #run DAR
     if (method == 'DAR') {
       argos <- DAR(argos, maxredun, ratecoef, minrate, keep_lc)
     } else {
       #run HYB
-      argos <- HYB()
+      argos <- HYB(argos, keep_lc, maxredun,
+                   keeplast, skiploc, #inputs for MRD filter
+                   minrate, ratecoef, r_only, #inputs for DAR filter
+                   xmigrate, xoverrun, xdirect, xangle, xpercent, test_0a, test_bz) #inputs for HYB filter
     }
   }
   outliers <- rbind(outliers, argos[which(argos$outlier == TRUE),])
   argos <- argos[which(argos$outlier == FALSE),]
-
-  ###############################################################################
-  ################################BOD_filt#######################################
-  ###############################################################################
 
   #perform best of day post-filtering if desired
   retained <- data.frame()
@@ -569,7 +673,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
           } else {
             if (rankmeth == 1) { #lc, iqx, iqy, nbmes
               #lc
-              new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
+              new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
               if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_mdargos)
                 next
@@ -597,7 +701,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             } else {
               if (rankmeth == 2) { #lc, iqx, nbmes, iqy
                 #lc
-                new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
+                new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
                 if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_mdargos)
                   next
@@ -625,7 +729,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               } else {
                 if (rankmeth == 3) { #lc, nbmes
                   #lc
-                  new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
+                  new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
                   if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                     retained <- rbind(retained, new_mdargos)
                     next
@@ -678,7 +782,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
         } else {
           if (rankmeth == 1) { #lc, iqx, iqy, nbmes
             #lc
-            new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
+            new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
             if (nrow(new_argos) == 1) { #if only one row exists, that is the best
               retained <- rbind(retained, new_argos)
               next
@@ -706,7 +810,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
           } else {
             if (rankmeth == 2) { #lc, iqx, nbmes, iqy
               #lc
-              new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
+              new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
               if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_argos)
                 next
@@ -734,7 +838,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             } else {
               if (rankmeth == 3) { #lc, nbmes
                 #lc
-                new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
+                new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
                 if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_argos)
                   next
@@ -755,10 +859,6 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     retained <- argos
   }
 
-  ###############################################################################
-  ###############################################################################
-  ###############################################################################
-
   #remove outliers from retained data and create combined dataframe and make sure user locations are kept in retained
   for (i in 1:nrow(argos)) {
     if (argos$Date[i] %in% retained$Date == FALSE) {
@@ -773,34 +873,34 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   #revert lc to characters
   if (nrow(retained) > 0) {
     for (r in 1:nrow(retained)) {
-      if (retained$LocationQuality[r] == 4) {
-        retained$LocationQuality[r] <- 'User'
+      if (retained$Quality[r] == 4) {
+        retained$Quality[r] <- 'User'
       }
-      if (retained$LocationQuality[r] == -3) {
-        retained$LocationQuality[r] <- 'Z'
+      if (retained$Quality[r] == -3) {
+        retained$Quality[r] <- 'Z'
       }
-      if (retained$LocationQuality[r] == -2) {
-        retained$LocationQuality[r] <- 'B'
+      if (retained$Quality[r] == -2) {
+        retained$Quality[r] <- 'B'
       }
-      if (retained$LocationQuality[r] == -1) {
-        retained$LocationQuality[r] <- 'A'
+      if (retained$Quality[r] == -1) {
+        retained$Quality[r] <- 'A'
       }
     }
   }
   if (nrow(outliers) > 0) {
     for (r in 1:nrow(outliers)) {
-      if (outliers$LocationQuality[r] == -3) {
-        outliers$LocationQuality[r] <- 'Z'
+      if (outliers$Quality[r] == -3) {
+        outliers$Quality[r] <- 'Z'
       }
-      if (outliers$LocationQuality[r] == -2) {
-        outliers$LocationQuality[r] <- 'B'
+      if (outliers$Quality[r] == -2) {
+        outliers$Quality[r] <- 'B'
       }
-      if (outliers$LocationQuality[r] == -1) {
-        outliers$LocationQuality[r] <- 'A'
+      if (outliers$Quality[r] == -1) {
+        outliers$Quality[r] <- 'A'
       }
     }
   }
-  outliers <- outliers[which(outliers$LocationQuality != 4)]
+  outliers <- outliers[which(outliers$Quality != 4)]
 
   #create dataframe with all argos locations
   all <- rbind(outliers, retained)
