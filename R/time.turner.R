@@ -19,7 +19,6 @@
 #' @export
 #' @examples #example not yet provided, sorry :(
 
-
 time.turner <- function(dt) {
   # Test to see if dt is already in correct format
   dt <- as.character(dt)
@@ -29,8 +28,8 @@ time.turner <- function(dt) {
     dtnew <- yearfirst <- dtstrp <- mm <- dd <- yyyy <- min <- ss <- hh <- j <- rep(NA, times = length(dt))
   } else {
     error.check <- tryCatch({dtnew <- dtstrp <- yearfirst <- strptime(dt, format = "%m/%d/%Y %H:%M:%S", tz = "GMT")},
-                            error <- function(e) {dtnew <- yearfirst <- dtstrp <- NA},
-                            finally <- {error = dtnew[1]})
+                            error = function(e) {dtnew <- yearfirst <- dtstrp <- NA},
+                            finally = {error = dtnew[1]})
     if (is.na(error.check[1])) {
       ##################################################
       # Assume you have unfixed width time/date data
