@@ -29,6 +29,7 @@
 #' \item{\strong{outliers: }} A dataframe containing all filtered-out input argos locations following the execution of the Douglas Argos-Filter algorithm.
 #' }
 #' @note For more information about the Douglas Argos-Filter Algorithm, see https://www.movebank.org/node/38, where you can find links to Douglas et al. 2012 (Methods in Ecology and Evolution) and the Douglas Argos-Filter Algorithm manual.
+#' @note This function does not return identical results to movebank or SAS because of different methods of calculating distances and headings on Earth's unique shape. However, the algorithms are the same across all platforms. In this function, we utilize the geosphere package (mainly the bearing and distVincentyEllipsoid function) for calculating distances and angles.
 #' @export
 #' @examples #examples not yet provided, sorry :(
 
@@ -277,6 +278,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   #######################internal angle function#################################
   ###############################################################################
 
+  #this function is used in the DAR and HYB filters below
   int_ang <- function (locA, locB, locC) {
     bearBA <- geosphere::bearing(locB, locA)
     if (bearBA < 0) {
