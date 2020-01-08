@@ -14,10 +14,20 @@ gps.filter <- function(gps, min.sat = 5, max.residual = 35) {
     bads <- which(!is.na(gps$Bad.Sats))
     gps$Good.Satellites <- gps$Satellites
     gps$Good.Satellites[bads] <- gps$Satellites[bads] - gps$Bad.Sats[bads]
-    gps <- gps[gps$Good.Satellites >= min.sat,]
-    res.test <- which(gps$Residual <= max.residual)
-    if (length(res.test) > 0) {gps <- gps[res.test,]}
+    sat.test <- gps[gps$Good.Satellites >= min.sat,]
+    res.test <- which(sat.test$Residual <= max.residual)
+    if (length(res.test) > 0) {sat.test <- sat.test[res.test,]}
   }
 
-  return(gps)
+  for (i in 1:nrow(gps)) {
+    if (gps$Day[i] %in% res.test$Day) {
+      gps$outlier[i] <- FALSE
+    } else {
+      gps$outlier[i] <- TRUE
+    }
+  }
+  retained <- gps[which(gps$outlier == FALSE),]
+  outliers <- gps[which(gps$outlier == FALSE),]
+
+  return(list(all = gps, retained = retained, outliers = outliers))
 }
