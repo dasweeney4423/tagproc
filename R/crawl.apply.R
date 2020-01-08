@@ -1,5 +1,3 @@
-data <- read_csv("C:/Users/marec/Docs/ZcTag059-Portal-164613/WC-pretty/164613-Locations.csv")
-
 crawl.apply <- function(data, model.interval = 1, land.adjust = TRUE, img.path = NULL) {
   if (nrow(data) > 0) {
     #convert Date to POSIXct if necessary
@@ -253,5 +251,169 @@ crawl.apply <- function(data, model.interval = 1, land.adjust = TRUE, img.path =
     # by creating a custom function `as.sf()` which will convert our `crwPredict` object
     # into an `sf` object of either "POINT" or "MULTILINESTRING"
 
-  } # end of if nrow(data) > 0
+
+    as.sf <- function(p,id,epsg,type,loctype) {
+      p <-
+        sf::st_as_sf(p, coords = c("mu.x","mu.y")) %>%
+        dplyr::mutate(TimeNum = lubridate::as_datetime(TimeNum),
+                      deployid = id) %>%
+        dplyr::rename(pred_dt = TimeNum) %>%
+        filter(loctype %in% loctype) %>%
+        sf::st_set_crs(.,epsg)
+      if (type == "POINT") return(p)
+      if (type == "LINE") {
+        p <- p %>% dplyr::arrange(pred_dt) %>%
+          sf::st_geometry() %>%
+          st_cast("MULTIPOINT",ids = as.integer(as.factor(p$deployid))) %>%
+          st_cast("MULTILINESTRING") %>%
+          st_sf(deployid = unique(p$deployid))
+        return(p)
+      }
+    }
+
+    data_fit <- data_fit %>%
+      dplyr::mutate(sf_points = purrr::map2(predict, DeployID,
+                                            as.sf,
+                                            epsg = 2230,
+                                            type = "POINT",
+                                            loctype = "p"),
+                    sf_line = purrr::map2(predict, DeployID,
+                                          as.sf,
+                                          epsg = 2230,
+                                          type = "LINE",
+                                          loctype = "p"))
+
+    # Isolate predicted points
+    sf_pred_points <- data_fit$sf_points %>%
+      purrr::lift(rbind)() %>%
+      sf::st_set_crs(2230)
+
+    sf_pred_lines <- data_fit$sf_line %>%
+      purrr::lift(rbind)() %>%
+      sf::st_set_crs(2230)
+
+    # Transform these back to Lat Long
+    m <- sf_pred_points %>%
+      sf::st_transform(4326)
+
+    xys <- as.character(m$geometry)
+
+    x <- y <- vector()
+    for (i in 1:length(xys)) {
+      xyi <- xys[i]
+      xyi <- substr(xyi, 3, nchar(xyi))
+      xyi <- substr(xyi, 1, nchar(xyi) - 1)
+      xi <- strsplit(xyi, ", ")[[1]][1]
+      yi <- strsplit(xyi, ", ")[[1]][2]
+      x <- c(x, xi)
+      y <- c(y, yi)
+    }
+    predicted.path <- data.frame(x,y)
+
+    #########################################################
+    ## Option:: Adjust Path Around Land
+
+    # The `crawl` package now includes a `fix_path()` function which will adjust any predicted path around land features using a least-cost function. For information on editing this for a specific region, see Josh's github repository nPacMaps.
+    # For Ziphius, area of interest is relatively large, so need to use coarse resolution.
+    # To customize a function like calcur() for region of interest, see code for that or bering() and modify according to your needs.
+
+    if (land.adjust) {
+
+      calcur_base <- suppressWarnings(ptolemy::calcur(epsg = 2230))
+      poly_expand <- 50000
+      res <- 1000
+      tmpland <- raster::rasterTmpFile()
+      r <- raster::raster(
+        ext = raster::extend(raster::extent(matrix(st_bbox(sf_pred_lines), 2)), poly_expand),
+        resolution = res,
+        crs = sp::CRS("+init=epsg:2230")
+      )
+      land <- raster::rasterize(calcur_base,
+                                r,
+                                getCover = TRUE,
+                                background = 0,
+                                filename = tmpland, overwrite = TRUE)
+
+      land <- land / 100
+      land[land < 1] <- 0
+      water <- raster::asFactor(1 - land)
+      trans <- gdistance::transition(water, "areas", directions = 16)[[1]]
+
+      # Replace original coordinates with our fixed values.
+      .fix_path <- function(prd, res_raster, trans) {
+        m <- crawl::fix_path(prd, res_raster = res_raster, trans = trans)
+        prd$mu.x <- m[, "mu.x"]
+        prd$mu.y <- m[, "mu.y"]
+        prd
+      }
+
+      tbl_locs_fit <- tbl_locs_fit %>%
+        dplyr::mutate(sf_points = purrr::map(predict,
+                                             .fix_path,
+                                             res_raster = land,
+                                             trans = trans))
+
+      tbl_locs_fit <- tbl_locs_fit %>%
+        dplyr::mutate(sf_lines = purrr::map2(sf_points,deployid,
+                                             as.sf,
+                                             epsg = 2230,
+                                             type = "LINE",
+                                             loctype = "p"))
+
+      tbl_locs_fit <- tbl_locs_fit %>%
+        dplyr::mutate(sf_points = purrr::map2(sf_points, deployid,
+                                              as.sf,
+                                              epsg = 2230,
+                                              type = "POINT",
+                                              loctype = "p"))
+
+      sf_pred_points <- tbl_locs_fit$sf_points %>%
+        purrr::lift(rbind)() %>% sf::st_set_crs(2230)
+
+      sf_pred_lines <- tbl_locs_fit$sf_lines %>%
+        purrr::lift(rbind)() %>% sf::st_set_crs(2230)
+
+      # Transform these fixed points back to Lat Long
+      m <- sf_pred_points %>%
+        sf::st_transform(4326)
+
+      xys <- as.character(m$geometry)
+
+      x <- y <- vector()
+      for (i in 1:length(xys)) {
+        xyi <- xys[i]
+        xyi <- substr(xyi, 3, nchar(xyi))
+        xyi <- substr(xyi, 1, nchar(xyi) - 1)
+        xi <- strsplit(xyi, ", ")[[1]][1]
+        yi <- strsplit(xyi, ", ")[[1]][2]
+        x <- c(x, xi)
+        y <- c(y, yi)
+      }
+      predicted.path <- data.frame(x,y)
+    }
+
+    #########################################################
+    # Format data to merge with tag-proc workflow
+
+    mr <- tbl_locs_fit$predict[[1]]
+
+    mydates <- as.POSIXlt(mr$TimeNum, tz = "GMT", origin = "1970-01-01 00:00:00 GMT")
+    mydates <- strftime(mydates, format = "%Y-%m-%d %H:%M:%S", tz = "GMT", usetz = FALSE)
+    mrDate <- mydates
+
+    mrDeployID <- rep(deployID, times = nrow(mr))
+    mrPtt <- rep(PTT,times=nrow(mr))
+    mrSatellite <- mr$sat_
+    mrLoc <- mr$quality
+
+    mrLatitude <- as.numeric(as.character(predicted.path$y))
+    mrLongitude <- as.numeric(as.character(predicted.path$x))
+
+    mr <- data.frame(DeployID = mrDeployID, Ptt = mrPtt, Date = mrDate, Satellite = mrSatellite, LocationQuality = mrLoc,
+                     Latitude = mrLatitude, Longitude = mrLongitude, Latitude2 = mrLatitude, Longitude2 = mrLongitude,
+                     Frequency = mr$frequency, land.adjust = land.adjust, model.interval = model.interval, mr)
+    names(mr)[which(names(mr) == "msg")] <- "MsgCount"
+
+    return(mr)
+  } # end of if nrow(tbl_locs) > 0
 }
