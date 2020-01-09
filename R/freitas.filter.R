@@ -5,7 +5,12 @@
 #' @param vmax Speed threshold for filter method, in m/s. Default is 2 m/s
 #' @param ang Angles of the spikes to be removed by freitas filter. Default is c(15, 25). No spikes are removed if ang=-1
 #' @param distlim Lengths of the above spikes (see input 'ang'), in kilometers. Default is c(2.5, 5).
-#' @return A dataframe of filtered locations that no longer includes the outliers.
+#' @return A list of three elements in similar format to the data provided in the input for argos:
+#' \itemize{
+#' \item{\strong{all: }} A dataframe containing all input argos locations with an additional column specifying whether the filter marked the given location as an outlier or not.
+#' \item{\strong{retained: }} A dataframe containing all retained input argos locations following the execution of the filter algorithm.
+#' \item{\strong{outliers: }} A dataframe containing all filtered-out input argos locations following the execution of the filter algorithm.
+#' }
 #' @examples #examples not yet provided, sorry :(
 
 freitas.filter <- function(argos, vmax = 2, ang = c(15, 25), distlim = c(2.5, 5)) {
