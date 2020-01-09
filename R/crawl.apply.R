@@ -1,3 +1,15 @@
+#' Perform CRAWL model on track data
+#'
+#' This function fits a continuous-time correlated random walk model to the given animal movement data
+#' @param data A dataframe containing locations to be used by the model
+#' @param model.interval Time interval in hours for each modelled location to be determined. Default is every 1 hour.
+#' @param crs Desired coordinate reference system. Input should be an integer of a epsg code
+#' @param land.adjust A function from the ptolemy package specifying a region of land to be adjusted for by the modelling process. If given (e.g. calcur), the track will avoid all land provided by this input
+#' @param img.path File path and name where a simple prediction track will be returned as a pdf image. Do not include .pdf in the file name as this will be added automatically.
+#' @param ... Additional inputs to be passed in order to the function input for land.adjust. See the ptolemy package for possible inputs.
+#' @return A dataframe of of the predicted and original locations and times.
+#' @examples #examples not yet provided, sorry :(
+
 crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL, img.path = NULL, ...) {
   if (nrow(data) > 0) {
     #convert Date to POSIXct if necessary
@@ -237,9 +249,10 @@ crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL
     data_fit <- data_fit %>%
       dplyr::mutate(predict = purrr::map(fit,
                                          crawl::crwPredict,
-                                         predTime = paste0(model.interval, ' hour')))
+                                         predTime = paste0(model.interval, ' hour'),
+                                         return.type = "flat"))
     if (!is.null(img.path)) {
-      pdf(file = paste0(img.path, "_", Sys.Date(), ".pdf"), height = 8, width = 7)
+      pdf(file = paste0(img.path, ".pdf"), height = 8, width = 7)
       data_fit$predict %>% purrr::walk(crawl::crwPredictPlot, plotType = "map")
       dev.off()
     }
@@ -251,21 +264,21 @@ crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL
     # into an `sf` object of either "POINT" or "MULTILINESTRING"
 
 
-    as.sf <- function(p,id,epsg,type,loctype) {
+    as.sf <- function(p, id, epsg, type, loctype) {
       p <-
         sf::st_as_sf(p, coords = c("mu.x","mu.y")) %>%
         dplyr::mutate(TimeNum = lubridate::as_datetime(TimeNum),
-                      deployid = id) %>%
+                      DeployID = id) %>%
         dplyr::rename(pred_dt = TimeNum) %>%
-        filter(loctype %in% loctype) %>%
+        #dplyr::filter(locType == loctype) %>%
         sf::st_set_crs(.,epsg)
-      if (type == "POINT") return(p)
+      if (type == "POINT") {return(p)}
       if (type == "LINE") {
         p <- p %>% dplyr::arrange(pred_dt) %>%
           sf::st_geometry() %>%
-          st_cast("MULTIPOINT",ids = as.integer(as.factor(p$deployid))) %>%
+          st_cast("MULTIPOINT", ids = as.integer(as.factor(p$DeployID))) %>%
           st_cast("MULTILINESTRING") %>%
-          st_sf(deployid = unique(p$deployid))
+          st_sf(DeployID = unique(p$DeployID))
         return(p)
       }
     }
@@ -311,103 +324,31 @@ crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL
 
     #########################################################
     ## Option:: Adjust Path Around Land
-    if (!is.null(land.adjust)) {
+    if (!is.null(land.adjust)) { #https://github.com/dsjohnson/crawl_examples/blob/master/land_corrections/harborSeal_land_correction.R
       #pull ptolemy function to get land from input 'land.adjust'
       land_base <- suppressWarnings(land.adjust(...))
-      poly_expand <- 50000
-      res <- 1000
-      tmpland <- raster::rasterTmpFile()
-      r <- raster::raster(
-        ext = raster::extend(raster::extent(matrix(st_bbox(sf_pred_lines), 2)), poly_expand),
-        resolution = res,
-        crs = sp::CRS(paste0("+init=epsg:",as.character(crs)))
-      )
-      land <- raster::rasterize(land_base,
-                                r,
-                                getCover = TRUE,
-                                background = 0,
-                                filename = tmpland, overwrite = TRUE)
-
-      land <- land / 100
-      land[land < 1] <- 0
-      water <- raster::asFactor(1 - land)
-      trans <- gdistance::transition(water, "areas", directions = 16)[[1]]
-
-      # Replace original coordinates with our fixed values.
-      .fix_path <- function(prd, res_raster, trans) {
-        m <- crawl::fix_path(prd, res_raster = res_raster, trans = trans)
-        prd$mu.x <- m[, "mu.x"]
-        prd$mu.y <- m[, "mu.y"]
-        prd
-      }
-
-      tbl_locs_fit <- tbl_locs_fit %>%
-        dplyr::mutate(sf_points = purrr::map(predict,
-                                             .fix_path,
-                                             res_raster = land,
-                                             trans = trans))
-
-      tbl_locs_fit <- tbl_locs_fit %>%
-        dplyr::mutate(sf_lines = purrr::map2(sf_points,deployid,
-                                             as.sf,
-                                             epsg = crs,
-                                             type = "LINE",
-                                             loctype = "p"))
-
-      tbl_locs_fit <- tbl_locs_fit %>%
-        dplyr::mutate(sf_points = purrr::map2(sf_points, deployid,
-                                              as.sf,
-                                              epsg = crs,
-                                              type = "POINT",
-                                              loctype = "p"))
-
-      sf_pred_points <- tbl_locs_fit$sf_points %>%
-        purrr::lift(rbind)() %>% sf::st_set_crs(crs)
-
-      sf_pred_lines <- tbl_locs_fit$sf_lines %>%
-        purrr::lift(rbind)() %>% sf::st_set_crs(crs)
-
-      # Transform these fixed points back to Lat Long
-      m <- sf_pred_points %>%
-        sf::st_transform(4326)
-
-      xys <- as.character(m$geometry)
-
-      x <- y <- vector()
-      for (i in 1:length(xys)) {
-        xyi <- xys[i]
-        xyi <- substr(xyi, 3, nchar(xyi))
-        xyi <- substr(xyi, 1, nchar(xyi) - 1)
-        xi <- strsplit(xyi, ", ")[[1]][1]
-        yi <- strsplit(xyi, ", ")[[1]][2]
-        x <- c(x, xi)
-        y <- c(y, yi)
-      }
-      predicted.path <- data.frame(x,y)
+      warning('land adjustments not yet created, output does not include this process')
     }
 
     #########################################################
     # Format data to merge with tag-proc workflow
 
-    mr <- tbl_locs_fit$predict[[1]]
+    mr <- data_fit$predict[[1]]
 
-    mydates <- as.POSIXlt(mr$TimeNum, tz = "GMT", origin = "1970-01-01 00:00:00 GMT")
-    mydates <- strftime(mydates, format = "%Y-%m-%d %H:%M:%S", tz = "GMT", usetz = FALSE)
-    mrDate <- mydates
+    mrDate <- mr$Date
 
-    mrDeployID <- rep(deployID, times = nrow(mr))
-    mrPtt <- rep(PTT,times=nrow(mr))
-    mrSatellite <- mr$sat_
-    mrLoc <- mr$quality
+    mrDeployID <- rep(data_fit$DeployID, times = nrow(mr))
+    mrPtt <- rep(data_fit$data[[1]]$Ptt[1], times = nrow(mr))
+    mrLoc <- mr$LocationQuality
 
     mrLatitude <- as.numeric(as.character(predicted.path$y))
     mrLongitude <- as.numeric(as.character(predicted.path$x))
 
-    mr <- data.frame(DeployID = mrDeployID, Ptt = mrPtt, Date = mrDate, Satellite = mrSatellite, LocationQuality = mrLoc,
-                     Latitude = mrLatitude, Longitude = mrLongitude, Latitude2 = mrLatitude, Longitude2 = mrLongitude,
-                     Frequency = mr$frequency, land.adjust = land.adjust, model.interval = model.interval, mr)
+    mr <- data.frame(DeployID = mrDeployID, Ptt = mrPtt, Date = mrDate, LocationQuality = mrLoc,
+                     Latitude = mrLatitude, Longitude = mrLongitude, Instr = mr$Instr, Type= mr$Type,
+                     mr[,c(8:34)])
     names(mr)[which(names(mr) == "msg")] <- "MsgCount"
 
     return(mr)
-  } # end of if nrow(tbl_locs) > 0
+  } # end of if nrow(data) > 0
 }
