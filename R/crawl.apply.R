@@ -1,4 +1,4 @@
-crawl.apply <- function(data, model.interval = 1, land.adjust = TRUE, img.path = NULL) {
+crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL, img.path = NULL, ...) {
   if (nrow(data) > 0) {
     #convert Date to POSIXct if necessary
     if ('POSIXct' %in% class(data$Date) == FALSE) {
@@ -49,8 +49,7 @@ crawl.apply <- function(data, model.interval = 1, land.adjust = TRUE, img.path =
     ### Create a Spatial Object
     sf_locs <- sf::st_as_sf(data, coords = c("Longitude","Latitude")) %>%
       sf::st_set_crs(., 4326)
-    # Best projection for Southern California region is abbreviated by the EPSG code of 2230.
-    sf_locs <- sf::st_transform(sf_locs, 2230)
+    sf_locs <- sf::st_transform(sf_locs, crs)
     sf::st_geometry(sf_locs)
 
     #At this point, `sf_locs` is a valid format for input to `crawl::crwMLE()`.
@@ -274,23 +273,23 @@ crawl.apply <- function(data, model.interval = 1, land.adjust = TRUE, img.path =
     data_fit <- data_fit %>%
       dplyr::mutate(sf_points = purrr::map2(predict, DeployID,
                                             as.sf,
-                                            epsg = 2230,
+                                            epsg = crs,
                                             type = "POINT",
                                             loctype = "p"),
                     sf_line = purrr::map2(predict, DeployID,
                                           as.sf,
-                                          epsg = 2230,
+                                          epsg = crs,
                                           type = "LINE",
                                           loctype = "p"))
 
     # Isolate predicted points
     sf_pred_points <- data_fit$sf_points %>%
       purrr::lift(rbind)() %>%
-      sf::st_set_crs(2230)
+      sf::st_set_crs(crs)
 
     sf_pred_lines <- data_fit$sf_line %>%
       purrr::lift(rbind)() %>%
-      sf::st_set_crs(2230)
+      sf::st_set_crs(crs)
 
     # Transform these back to Lat Long
     m <- sf_pred_points %>%
@@ -312,23 +311,18 @@ crawl.apply <- function(data, model.interval = 1, land.adjust = TRUE, img.path =
 
     #########################################################
     ## Option:: Adjust Path Around Land
-
-    # The `crawl` package now includes a `fix_path()` function which will adjust any predicted path around land features using a least-cost function. For information on editing this for a specific region, see Josh's github repository nPacMaps.
-    # For Ziphius, area of interest is relatively large, so need to use coarse resolution.
-    # To customize a function like calcur() for region of interest, see code for that or bering() and modify according to your needs.
-
-    if (land.adjust) {
-
-      calcur_base <- suppressWarnings(ptolemy::calcur(epsg = 2230))
+    if (!is.null(land.adjust)) {
+      #pull ptolemy function to get land from input 'land.adjust'
+      land_base <- suppressWarnings(land.adjust(...))
       poly_expand <- 50000
       res <- 1000
       tmpland <- raster::rasterTmpFile()
       r <- raster::raster(
         ext = raster::extend(raster::extent(matrix(st_bbox(sf_pred_lines), 2)), poly_expand),
         resolution = res,
-        crs = sp::CRS("+init=epsg:2230")
+        crs = sp::CRS(paste0("+init=epsg:",as.character(crs)))
       )
-      land <- raster::rasterize(calcur_base,
+      land <- raster::rasterize(land_base,
                                 r,
                                 getCover = TRUE,
                                 background = 0,
@@ -356,22 +350,22 @@ crawl.apply <- function(data, model.interval = 1, land.adjust = TRUE, img.path =
       tbl_locs_fit <- tbl_locs_fit %>%
         dplyr::mutate(sf_lines = purrr::map2(sf_points,deployid,
                                              as.sf,
-                                             epsg = 2230,
+                                             epsg = crs,
                                              type = "LINE",
                                              loctype = "p"))
 
       tbl_locs_fit <- tbl_locs_fit %>%
         dplyr::mutate(sf_points = purrr::map2(sf_points, deployid,
                                               as.sf,
-                                              epsg = 2230,
+                                              epsg = crs,
                                               type = "POINT",
                                               loctype = "p"))
 
       sf_pred_points <- tbl_locs_fit$sf_points %>%
-        purrr::lift(rbind)() %>% sf::st_set_crs(2230)
+        purrr::lift(rbind)() %>% sf::st_set_crs(crs)
 
       sf_pred_lines <- tbl_locs_fit$sf_lines %>%
-        purrr::lift(rbind)() %>% sf::st_set_crs(2230)
+        purrr::lift(rbind)() %>% sf::st_set_crs(crs)
 
       # Transform these fixed points back to Lat Long
       m <- sf_pred_points %>%
