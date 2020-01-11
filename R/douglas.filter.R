@@ -908,7 +908,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
       }
     }
   }
-  outliers <- outliers[which(outliers$LocationQuality != 4)]
+  outliers <- outliers[which(outliers$LocationQuality != 4),]
 
   #create dataframe with all argos locations
   all <- rbind(outliers, retained)
