@@ -71,7 +71,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   #temporarily change lc letters to numbers to allow for easier comparison
   user <- data.frame()
   for (r in 1:nrow(argos)) {
-    if (argos$LocationQuality[r] %in% c('User', 'DP', NA)) {
+    if (argos$Type[r] %in% c('User', 'user', 'Deploy', 'deploy', 'DP', NA)) {
       user <- rbind(user, argos[r,]) #pull out user defined locations to ensure they are kept after filtering
       argos$LocationQuality[r] <- 4
     }
@@ -882,7 +882,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   if (nrow(retained) > 0) {
     for (r in 1:nrow(retained)) {
       if (retained$LocationQuality[r] == 4) {
-        retained$LocationQuality[r] <- 'User'
+        retained$Type[r] <- 'User'
       }
       if (retained$LocationQuality[r] == -3) {
         retained$LocationQuality[r] <- 'Z'
