@@ -1,14 +1,14 @@
-bathy.sync <- function(env, z.radius = .25, online = FALSE) {
-  if (online == FALSE) {
+bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
+  if (!is.null(bathy.folder)) {
     # Prep data
     # Remove NA positions
-    nas <- which(is.na(env[, which(names(env) %in% c("Latitude", "StartLat"))]))
-    nas <- c(nas,which(is.na(env[, which(names(env) %in% c("Longitude", "StartLon"))])))
+    nas <- which(is.na(data[, which(names(data) %in% c("Latitude", "StartLat"))]))
+    nas <- c(nas,which(is.na(data[, which(names(data) %in% c("Longitude", "StartLon"))])))
     nas <- unique(nas)
-    if (length(nas) > 0) {env <- env[-nas,]}
+    if (length(nas) > 0) {data <- data[-nas,]}
 
-    LAT <- env[, which(names(env) %in% c("Latitude", "StartLat"))]
-    LON <- env[, which(names(env) %in% c("Longitude", "StartLon"))]
+    LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
+    LON <- data[, which(names(data) %in% c("Longitude", "StartLon"))]
 
     latrange <- range(min(LAT, na.rm = TRUE), max(LAT, na.rm = TRUE))
     lonrange <- range(min(LON, na.rm = TRUE), max(LON, na.rm = TRUE))
@@ -19,7 +19,7 @@ bathy.sync <- function(env, z.radius = .25, online = FALSE) {
 
     #########################################################
     # See which depth files will be needed for this tag
-    lf <- list.files("./Resources-Seafloor")
+    lf <- list.files(bathy.folder)
     depthlf <- gsub("NEPACseafloor-", "", lf) # remove prefix
     depthlf <- gsub(".csv", "", depthlf) # remove ".csv"
 
@@ -28,10 +28,10 @@ bathy.sync <- function(env, z.radius = .25, online = FALSE) {
     lonmin <- lonmax <- latmin <- latmax <- vector()
     for (i in 1:length(lfsplit)) {
       lfspliti <- lfsplit[[i]]
-      lonmin[i] <- as.numeric( paste0("-", lfspliti[1]))
-      lonmax[i] <- as.numeric( paste0("-", lfspliti[3]))
-      latmin[i] <- as.numeric( paste0(lfspliti[2]))
-      latmax[i] <- as.numeric( paste0(lfspliti[4]))
+      lonmin[i] <- as.numeric(paste0("-", lfspliti[1]))
+      lonmax[i] <- as.numeric(paste0("-", lfspliti[3]))
+      latmin[i] <- as.numeric(paste0(lfspliti[2]))
+      latmax[i] <- as.numeric(paste0(lfspliti[4]))
     }
 
     # See which files include depth data for this tag
@@ -55,17 +55,17 @@ bathy.sync <- function(env, z.radius = .25, online = FALSE) {
     # Load depth data
     zdf <- data.frame()
     for (i in 1:length(toload)) {
-      zfile <- paste0("./Resources-Seafloor/", lf[toload[i]])
+      zfile <- paste0(bathy.folder, lf[toload[i]])
       zi <- read.csv(zfile, header = TRUE)
       zi <- zi[zi$z < 0,]
       zdf <- rbind(zdf, zi)
     }
 
     # Setup variables
-    z <- zslope <- zaspect <- rep(NA, times = nrow(env))
+    z <- zslope <- zaspect <- rep(NA, times = nrow(data))
 
     # Loop thru each entry, calculate variables
-    for (i in 1:nrow(env)) {
+    for (i in 1:nrow(data)) {
       x <- LON[i]
       y <- LAT[i]
 
@@ -99,21 +99,21 @@ bathy.sync <- function(env, z.radius = .25, online = FALSE) {
     }
 
     # Add calculated variables to results dataframe
-    env$z <- z
-    env$zslope <- zslope
-    env$zaspect <- zaspect
+    data$z <- z
+    data$zslope <- zslope
+    data$zaspect <- zaspect
 
-    return(env)
+    return(data)
   } else { #if online == TRUE
     if (z.radius < 2.5) {z.radius <- 2.5} # This dataset can't use anything more precise than this radius
 
     # Prep data
-    LAT <- env[, which(names(env) %in% c("Latitude", "StartLat"))]
-    LON <- env[, which(names(env) %in% c("Longitude", "StartLon"))]
+    LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
+    LON <- data[, which(names(data) %in% c("Longitude", "StartLon"))]
 
     # Get depth and slope for each point
-    n <- zmin <- zmax <- z <- zslope <- zaspect <- rep(NA, times = nrow(env))
-    for (i in 1:nrow(env)) {
+    n <- zmin <- zmax <- z <- zslope <- zaspect <- rep(NA, times = nrow(data))
+    for (i in 1:nrow(data)) {
       xi <- as.numeric(as.character(LON[i]))
       yi <- as.numeric(as.character(LAT[i]))
 
@@ -144,13 +144,13 @@ bathy.sync <- function(env, z.radius = .25, online = FALSE) {
     }
 
     # Add calculated variables to results dataframe
-    env$z <- z
-    env$zslope <- zslope
-    env$zaspect <- zaspect
-    env$zn <- n
-    env$zmin <- zmin
-    env$zmax <- zmax
+    data$z <- z
+    data$zslope <- zslope
+    data$zaspect <- zaspect
+    data$zn <- n
+    data$zmin <- zmin
+    data$zmax <- zmax
 
-    return(env)
+    return(data)
   }
 }
