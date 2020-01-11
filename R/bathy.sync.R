@@ -14,8 +14,8 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
     lonrange <- range(min(LON, na.rm = TRUE), max(LON, na.rm = TRUE))
 
     coord <- data.frame(longitude = LON, latitude = LAT)
-    coordinates(coord) <- c("longitude", "latitude")
-    proj4string(coord) <- CRS("+proj=longlat +datum=WGS84")
+    sp::coordinates(coord) <- c("longitude", "latitude")
+    sp::proj4string(coord) <- sp::CRS("+proj=longlat +datum=WGS84")
 
     #########################################################
     # See which depth files will be needed for this tag
@@ -45,9 +45,9 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
       x <- c(x1, x1, x2, x2, x1)
       y <- c(y1, y2, y2, y1, y1)
       xy <- cbind(x, y)
-      xy <- Polygons(list(Polygon(xy)), ID=1)
-      xy <- SpatialPolygons(list(xy), proj4string = CRS("+proj=longlat +datum=WGS84"))
-      inpoly <- over(coord, xy)
+      xy <- sp::Polygons(list(sp::Polygon(xy)), ID=1)
+      xy <- sp::SpatialPolygons(list(xy), proj4string = sp::CRS("+proj=longlat +datum=WGS84"))
+      inpoly <- sp::over(coord, xy)
       nin <- length(inpoly[!is.na(inpoly)])
       if (nin > 0) {toload <- c(toload, i)}
     }
@@ -55,7 +55,7 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
     # Load depth data
     zdf <- data.frame()
     for (i in 1:length(toload)) {
-      zfile <- paste0(bathy.folder, lf[toload[i]])
+      zfile <- paste0(bathy.folder, '/', lf[toload[i]])
       zi <- read.csv(zfile, header = TRUE)
       zi <- zi[zi$z < 0,]
       zdf <- rbind(zdf, zi)
@@ -122,14 +122,20 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
         bottom <- swfscMisc::destination(lat = yi, lon = xi, brng = 180, distance = z.radius, units = "km", type = "vincenty")[1]
         left <- swfscMisc::destination(lat = yi, lon = xi, brng = 270, distance = z.radius, units = "km", type = "vincenty")[2]
         right <- swfscMisc::destination(lat = yi, lon = xi, brng = 90, distance = z.radius, units = "km", type = "vincenty")[2]
-        bath <- suppressMessages(getNOAA.bathy(lon1 = left, lon2 = right, lat1 = bottom, lat2 = top, resolution = 1, keep = FALSE, antimeridian = FALSE))
-        bath <- as.xyz(bath)
+        bath <- suppressMessages(marmap::getNOAA.bathy(lon1 = left, lon2 = right, lat1 = bottom, lat2 = top, resolution = 1, keep = FALSE, antimeridian = FALSE))
+        bath <- marmap::as.xyz(bath)
         names(bath) <- c("x", "y", "z")
 
         n[i] <- nrow(bath)
-        zmin[i] <- abs(max(bath$z[bath$z < 0]))
-        zmax[i] <- abs(min(bath$z))
-        z[i] <- abs(mean(bath$z[bath$z < 0]))
+        if (min(bath$z, na.rm = T) >= 0) {
+          zmin[i] <- min(bath$z, na.rm = T)
+          zmax[i] <- max(bath$z, na.rm = T)
+          z[i] <- mean(bath$z, na.rm = T)
+        } else {
+          zmin[i] <- abs(max(bath$z[bath$z < 0], na.rm = T))
+          zmax[i] <- abs(min(bath$z, na.rm = T))
+          z[i] <- abs(mean(bath$z[bath$z < 0], na.rm = T))
+        }
 
         # Get slope - distance between points
         zdiff <- zmax[i] - zmin[i]
