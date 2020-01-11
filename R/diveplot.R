@@ -20,7 +20,7 @@ diveplot <- function(data,
   data$Shape[data$Shape == "U"] <- "u"
   data$Shape[data$Shape == "V"] <- "v"
   data$Shape[data$Shape == "Square"] <- "sq"
-  data$Shape[data$Shape == ""] <- "su"
+  data$Shape[is.na(data$Shape)] <- "su"
 
   mr <- data.frame()
   for (i in 1:nrow(data)) {
