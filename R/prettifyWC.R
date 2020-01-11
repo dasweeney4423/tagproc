@@ -163,7 +163,7 @@ prettifyWC <- function(WCfolder) {
       if(nrow(data) > 0) {
         DATE <- paste0(data$Day, " ", data$Time)
         DATE <- time.turner(DATE)$raw
-        data$Day <- DATE
+        data$Date <- DATE
         data$Time <- NULL
         prettyname <- paste0(newdir, "/", FILE)
         write.csv(data, file = prettyname, quote = FALSE, row.names = FALSE)
@@ -249,7 +249,7 @@ prettifyWC <- function(WCfolder) {
       if (nrow(data) > 0) {
         names(data)[which(names(data) == "Name")] <- "DeployID"
         DATE <- paste0(data$Day, " ", data$Time)
-        data$Day <- time.turner(DATE)$raw
+        data$Date <- time.turner(DATE)$raw
         data$Time <- NULL
         prettyname <- paste0(newdir, "/", FILE)
         write.csv(data, file = prettyname, quote = FALSE, row.names = FALSE)
@@ -266,7 +266,7 @@ prettifyWC <- function(WCfolder) {
         if (nrow(data) > 0) {
           names(data)[which(names(data) == "Name")] <- "DeployID"
           DATE <- paste0(data$Day, " ", data$Time)
-          data$Day <- time.turner(DATE)$raw
+          data$Date <- time.turner(DATE)$raw
           data$Time <- NULL
           data$InitTime <- time.turner(data$InitTime)$raw
           prettyname <- paste0(newdir, "/", FILE)

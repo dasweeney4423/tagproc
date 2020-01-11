@@ -25,7 +25,7 @@ gps.filter <- function(gps, min.sat = 5, max.residual = 35) {
   }
 
   for (i in 1:nrow(gps)) {
-    if (gps$Day[i] %in% res.test$Day) {
+    if (gps$Date[i] %in% res.test$Date) {
       gps$outlier[i] <- FALSE
     } else {
       gps$outlier[i] <- TRUE
