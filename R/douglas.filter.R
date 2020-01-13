@@ -536,6 +536,10 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
 
         #move to next iteration
         iteration <- iteration + 1
+        rA <- 1
+        rB <- rA + 1
+        rC <- rB + 1
+        rD <- rC + 1
       }
 
       return(argos)
