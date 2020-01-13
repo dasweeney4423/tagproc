@@ -19,7 +19,7 @@
 
 diveplot <- function(data,
                      zmin = 0, zmax = NULL,
-                     Rec.begin = 1, Rec.end = nrow(data),
+                     Rec.begin = NULL, Rec.end = NULL,
                      cex.axis = 1,
                      lwd = 2,
                      col = "black",
@@ -27,6 +27,12 @@ diveplot <- function(data,
                      plot.records = FALSE,
                      plot.w = 12, plot.ratio = 2.25,
                      plotfile = NULL) {
+  if (is.null(Rec.begin)) {
+    Rec.begin <- 1
+  }
+  if (is.null(Rec.end)) {
+    Rec.end <- nrow(data)
+  }
   data <- data[Rec.begin:Rec.end,]
   data$TagID <- as.character(data$TagID)
   data$PTT <- as.character(data$PTT)
