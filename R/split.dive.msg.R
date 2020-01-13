@@ -109,5 +109,5 @@ split.dive.msg <- function(data, kclusters = NULL) {
                       Deep = dive$Deep,
                       Kmeans = dive$Kmeans)
 
-  return(list(Dives, Messages))
+  return(list(Dives = Dives, Messages = Messages))
 }
