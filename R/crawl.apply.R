@@ -60,7 +60,7 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
 
     #########################################################
     ### Create a Spatial Object
-    sf_locs <- sf::st_as_sf(data, coords = c("Longitude","Latitude")) %>%
+    sf_locs <- sf::st_as_sf(data, coords = c("Longitude", "Latitude")) %>%
       sf::st_set_crs(., 4326)
     sf_locs <- sf::st_transform(sf_locs, crs)
     sf::st_geometry(sf_locs)
