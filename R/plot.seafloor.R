@@ -1,3 +1,10 @@
+#' Plot bathymetry data
+#'
+#' Plot bathymetry data that has been collected from the bathy.sync()) function
+#' @param data A dataframe obtained after using the bathy.sync() function that contains bathymetry data associated with tag data
+#' @return A multipanelled figure plotting important bathymetry variables
+#' @examples #examples not yet provided, sorry :(
+
 plot.seafloor <- function(data) {
   par(mfrow=c(2, 1))
 

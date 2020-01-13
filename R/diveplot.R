@@ -1,3 +1,22 @@
+#' Plot dive profile using dive shapes
+#'
+#' This function is used to visualize part or all of a dive profile by plotting dives based on their individual dive shapes
+#' @param data A dataframe that contains the dive depths and shapes from split.dive.msg()
+#' @param zmin Minimum depth limit for plot
+#' @param zmax Maximum depth limit on plot. If NULL, the maximum depth of all dives is used
+#' @param Re.begin Which dive to begin at? Default is begin at the first dive
+#' @param Rec.end Which dive to end at? Default is end at the last dive
+#' @param cex.axis Axis font size
+#' @param lwd Line width
+#' @param col Line color
+#' @param mars Figure margins
+#' @param plot.records Whether or not to plot record numbers for dives
+#' @param plot.w Width of figure to be made when saving as pdf
+#' @param plot.ratio Ratio of width to height when saving figure as pdf
+#' @param plotfile File path and name of where to save figure as pdf. Default is that a figure is not saved
+#' @return A dive profile is plotted and saved as a pdf is desired
+#' @examples #examples not yet provided, sorry :(
+
 diveplot <- function(data,
                      zmin = 0, zmax = NULL,
                      Rec.begin = 1, Rec.end = nrow(data),
@@ -11,15 +30,8 @@ diveplot <- function(data,
   data <- data[Rec.begin:Rec.end,]
   data$TagID <- as.character(data$TagID)
   data$PTT <- as.character(data$PTT)
-
   data$Event <- as.character(data$Event)
-  data$Event[data$Event == "Dive"] <- "div"
-  data$Event[data$Event == "Surface"] <- "sur"
-
   data$Shape <- as.character(data$Shape)
-  data$Shape[data$Shape == "U"] <- "u"
-  data$Shape[data$Shape == "V"] <- "v"
-  data$Shape[data$Shape == "Square"] <- "sq"
   data$Shape[is.na(data$Shape)] <- "su"
 
   mr <- data.frame()
@@ -29,7 +41,7 @@ diveplot <- function(data,
     ID <- data$RecordNo[i]
     ev <- data$Event[i]
     z <- data$DepthAvg[i]
-    if (ev == "sur") {z <- 0}
+    if (ev == "Surface") {z <- 0}
     shape <- data$Shape[i]
     subev <- paste0(ev, "-start")
     hr <- data$StartTime[i]
@@ -75,19 +87,19 @@ diveplot <- function(data,
     transittime <- z / 3
     transittime <- transittime / 60
 
-    if (type == "v") {
+    if (type == "V") {
       newtime <- time1 + (timediff / 2)
       mri$tsum[1:2] <- newtime
     }
 
-    if (type == "sq") {
+    if (type == "Square") {
       tnew1 <- time1 + transittime
       tnew2 <- time2 - transittime
       mri$tsum[1] <- tnew1
       mri$tsum[2] <- tnew2
     }
 
-    if (type == "u") {
+    if (type == "U") {
       # The U has 12 nodes
       mru <- mri
       mru <- mru[1,] # take start of dive
@@ -126,8 +138,8 @@ diveplot <- function(data,
   ats <- mrplot$tsum[markers]
 
   # Remove obviously erroneous records
-  mrplot$tsum[mrplot$tdiff > 200 & substr(mrplot$ev, 1, 3) == "div"] <- NA
-  mrplot$tsum[mrplot$tdiff > 20  & substr(mrplot$ev, 1, 3) == "sur"] <- NA
+  mrplot$tsum[mrplot$tdiff > 200 & substr(mrplot$ev, 1, 3) == "Dive"] <- NA
+  mrplot$tsum[mrplot$tdiff > 20  & substr(mrplot$ev, 1, 3) == "Surface"] <- NA
 
   # Plot it!
   if (!is.null(plotfile)){

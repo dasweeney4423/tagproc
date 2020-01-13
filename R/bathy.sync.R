@@ -1,3 +1,12 @@
+#' Sync bathymetry and behavioral data
+#'
+#' Pulls bathymetry data from either the internet or a provided database and associates it with tag locations
+#' @param data A dataframe of location data to associate with bathymetry data
+#' @param z.radius Distance in km around each location that seafloor depth and slope will be calculated
+#' @param bathy.folder A directory path to the folder containing all bathymetry data. File names in the folder must be like this :'NEPACseafloor-116.000-30.000-115.000-31.000.csv'. If this input is NULL, data will be pulled from online, thus requiring internet access.
+#' @return A dataframe with all tag data and its associated bathymetry data as new columns in the dataset
+#' @examples #examples not yet provided, sorry :(
+
 bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
   if (!is.null(bathy.folder)) {
     # Prep data
