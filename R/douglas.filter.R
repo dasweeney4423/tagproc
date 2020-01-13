@@ -883,6 +883,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     for (r in 1:nrow(retained)) {
       if (retained$LocationQuality[r] == 4) {
         retained$Type[r] <- 'User'
+        retained$LocationQuality[r] <- 'User'
       }
       if (retained$LocationQuality[r] == -3) {
         retained$LocationQuality[r] <- 'Z'
