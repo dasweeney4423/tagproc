@@ -12,6 +12,7 @@
 
 crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL, img.path = NULL, ...) {
   if (nrow(data) > 0) {
+    suppressWarnings(suppressPackageStartupMessages(require(sf)))
     #convert Date to POSIXct if necessary
     if ('POSIXct' %in% class(data$Date) == FALSE) {
       data$Date <- as.POSIXct(as.character(data$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
