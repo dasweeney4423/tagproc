@@ -2,7 +2,7 @@
 #'
 #' This function fits a continuous-time correlated random walk model to the given animal movement data
 #' @param data A dataframe containing locations to be used by the model
-#' @param model.interval Time interval in hours for each modelled location to be determined. Default is every 1 hour.
+#' @param model.interval Time interval for each modelled location to be determined. Default is every 1 hour. This input should be done in the form as required by the predTime in the crwPredict() function in the crawl package.
 #' @param crs Desired coordinate reference system. Input should be an integer of a epsg code
 #' @param land.adjust A function from the ptolemy package specifying a region of land to be adjusted for by the modelling process. If given (e.g. calcur), the track will avoid all land provided by this input
 #' @param img.path File path and name where a simple prediction track will be returned as a pdf image. Do not include .pdf in the file name as this will be added automatically.
@@ -10,7 +10,7 @@
 #' @return A dataframe of of the predicted and original locations and times.
 #' @examples #examples not yet provided, sorry :(
 
-crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL, img.path = NULL, ...) {
+crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust = NULL, img.path = NULL, ...) {
   if (nrow(data) > 0) {
     suppressWarnings(suppressPackageStartupMessages(require(sf)))
     #convert Date to POSIXct if necessary
@@ -250,7 +250,7 @@ crawl.apply <- function(data, model.interval = 1, crs = 2230, land.adjust = NULL
     data_fit <- data_fit %>%
       dplyr::mutate(predict = purrr::map(fit,
                                          crawl::crwPredict,
-                                         predTime = paste0(model.interval, ' hour'),
+                                         predTime = model.interval,
                                          return.type = "flat"))
     if (!is.null(img.path)) {
       pdf(file = paste0(img.path, ".pdf"), height = 8, width = 7)
