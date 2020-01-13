@@ -51,3 +51,16 @@ tag.mapper(CRAWL_data, zoom = 1, lon.offset = 0, lat.offset = 0,
                        lwd = .5, pch = 1, cex = .5, col = "black", 
                        mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
+
+We should also view a the dive profile of this individual. However, before we do that we should split our dive behavior file into dive data and message data.
+
+```{r}
+#pull in data
+Beh_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164613-Behavior.csv")
+
+#split behavior data
+split_Beh <- split.dive.msg(Beh_data, kclusters = 2)
+
+#plot dives
+diveplot(split_Beh$Dives)
+```
