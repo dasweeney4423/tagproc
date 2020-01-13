@@ -41,7 +41,7 @@ GF_data <- gps.filter(GPS_data, min.sat = 5, max.residual = 35)$retained
 I will not create an estimated track from a CRAWL model:
 
 ```{r}
-CRAWL_data <- crawl.apply(DF_data, model.interval = 1, crs = 2230, land.adjust = NULL, img.path = NULL)
+CRAWL_data <- crawl.apply(DF_data, model.interval = '30 mins', crs = 2230, land.adjust = NULL, img.path = NULL)
 ```
 
 Now we can plot the CRAWL data to see how it looks.
