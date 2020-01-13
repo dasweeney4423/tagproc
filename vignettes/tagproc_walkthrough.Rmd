@@ -14,6 +14,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
 ```
 
 In this tutorial, we will be using data from ZcTag059. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made.
@@ -25,7 +26,7 @@ prettifyWC(ZcTag059_folder)
 
 The new folder that is created is located within the tag data folder and is names WC-pretty. Opening up this new folder, you will see the same data files, but they will have been cleaned and prettified. 
 
-We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter and the Freitas filter on the argos data, and a basic GPS filter on our GPS data.
+We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter on the argos data and a basic GPS filter on our GPS data.
 
 ```{r}
 #pull in data
@@ -34,6 +35,19 @@ Argos_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164
 
 #run filters
 DF_data <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', keep_lc = 1, maxredun = 3, duplrec = 'offset', minrate = 15, ratecoef = 20, r_only = FALSE)$retained
-FF_data <- freitas.filter(Argos_data, vmax = 3, ang = c(15, 25), distlim = c(2.5, 5))$retained
 GF_data <- gps.filter(GPS_data, min.sat = 5, max.residual = 35)$retained
+```
+
+I will not create an estimated track from a CRAWL model:
+
+```{r}
+CRAWL_data <- crawl.apply(DF_data, model.interval = 1, crs = 2230, land.adjust = NULL, img.path = NULL)
+```
+
+Now we can plot the CRAWL data to see how it looks.
+
+```{r}
+tag.mapper(CRAWL_data, zoom = 1, lon.offset = 0, lat.offset = 0,
+                       lwd = .5, pch = 1, cex = .5, col = "black", 
+                       mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
