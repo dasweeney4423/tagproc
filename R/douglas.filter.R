@@ -72,8 +72,8 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   user <- data.frame()
   for (r in 1:nrow(argos)) {
     if (argos$Type[r] %in% c('User', 'user', 'Deploy', 'deploy', 'DP', NA)) {
-      user <- rbind(user, argos[r,]) #pull out user defined locations to ensure they are kept after filtering
       argos$LocationQuality[r] <- 4
+      user <- rbind(user, argos[r,]) #pull out user defined locations to ensure they are kept after filtering
     }
     if (argos$LocationQuality[r] == 'Z') {
       argos$LocationQuality[r] <- -3
