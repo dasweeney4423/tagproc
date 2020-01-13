@@ -1,7 +1,7 @@
 #' Basic figure creation of track
 #'
 #' This function creates a simple figure showing the animal track locations as points along with a visualized path
-#' @param data A dataframe containing locations to be used by the model
+#' @param data A dataframe containing locations to be plotted
 #' @param zoom Amount of zooming in figure creation. Larger values zoom OUT more while small numbers zoom IN. Default is 1
 #' @param lon.offset  Amount of shifting to occur along the longitude when creating the figure.
 #' @param lat.offset Amount of shifting to occur along the latitude when creating the figure. Default is no shifting
