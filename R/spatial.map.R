@@ -1,4 +1,25 @@
+#' Plot spatial data on map
+#'
+#' This function is able to take many different spatial objects and plot them on an esri map.
+#' @param ... Spatial objects that you wish to plot. Can be linestrings, points, polygons...
+#' @param color A vector the same size as the number of spatial object inputs that specifies the color desired for each of the objects in the order they are given.
+#' @param size A vector the same size as the number of spatial object inputs that specifies the size desired for each of the objects in the order they are given.
+#' @param title A main title to be made for the figure
+#' @param subtitle A subtitle to be made for the figure
+#' @param crs
+#' @examples #examples not yet provided, sorry :(
+
 spatial.map <- function(..., color = NULL, size = NULL, title = NULL, subtitle = NULL, crs = NULL) {
+  if (!is.null(color)) {
+    if (length(color) != ...length()) {
+      stop('number of color inputs must match the number of spatial object inputs')
+    }
+  }
+  if (!is.null(size)) {
+    if (length(size) != ...length()) {
+      stop('number of size inputs must match the number of spatial object inputs')
+    }
+  }
 
   #get earth tiles
   esri_ocean <- paste0('https://services.arcgisonline.com/arcgis/rest/services/Ocean/World_Ocean_Base/MapServer/tile/${z}/${y}/${x}.jpeg')
