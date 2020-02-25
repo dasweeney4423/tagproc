@@ -60,26 +60,26 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   if ('POSIXct' %in% class(argos$Date) == FALSE) {
     argos$Date <- as.POSIXct(as.character(argos$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
   }
-  argos$Quality <- as.character(argos$Quality)
+  argos$LocationQuality <- as.character(argos$LocationQuality)
 
   #temporarily change lc letters to numbers to allow for easier comparison
   user <- data.frame()
   for (r in 1:nrow(argos)) {
     if (argos$Type[r] %in% c('User', 'user', 'Deploy', 'deploy', 'DP', NA)) {
-      argos$Quality[r] <- 4
+      argos$LocationQuality[r] <- 4
       user <- rbind(user, argos[r,]) #pull out user defined locations to ensure they are kept after filtering
     }
-    if (argos$Quality[r] == 'Z') {
-      argos$Quality[r] <- -3
+    if (argos$LocationQuality[r] == 'Z') {
+      argos$LocationQuality[r] <- -3
     }
-    if (argos$Quality[r] == 'B') {
-      argos$Quality[r] <- -2
+    if (argos$LocationQuality[r] == 'B') {
+      argos$LocationQuality[r] <- -2
     }
-    if (argos$Quality[r] == 'A') {
-      argos$Quality[r] <- -1
+    if (argos$LocationQuality[r] == 'A') {
+      argos$LocationQuality[r] <- -1
     }
   }
-  argos$Quality <- as.numeric(argos$Quality)
+  argos$LocationQuality <- as.numeric(argos$LocationQuality)
   if (nrow(user) > 0) {
     user$outlier <- FALSE
   }
@@ -122,10 +122,10 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
 
   #find best of primary and alternate locations if data in least-squares argos locations
   if (argos_method == 'LS') {
-    Zclass <- argos[which(argos$Quality == -3),]
+    Zclass <- argos[which(argos$LocationQuality == -3),]
     Zclass$Latitude <- NA
     Zclass$Longitude <- NA
-    argos <- argos[which(argos$Quality != -3),]
+    argos <- argos[which(argos$LocationQuality != -3),]
 
     #create starting locations and distances/loc-strings
     l1 <- 1
@@ -458,7 +458,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
       argos$outlier <- filtered
 
       #force locations with lc >= keep_lc to be retained
-      argos$outlier[which(argos$Quality >= keep_lc)] <- FALSE
+      argos$outlier[which(argos$LocationQuality >= keep_lc)] <- FALSE
 
       #force last location to be retained if desired
       if (keeplast == TRUE) {
@@ -524,7 +524,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
 
           #step 2
           if (skip == FALSE) {
-            if (subargos$Quality[rB] >= keep_lc) {
+            if (subargos$LocationQuality[rB] >= keep_lc) {
               subargos$outlier[rB] <- FALSE
               skip <- TRUE
             }
@@ -704,7 +704,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               }
 
               #retain or filter based on lc and other inputs
-              if (data$Quality[i] %in% c(-3, -2)) {
+              if (data$LocationQuality[i] %in% c(-3, -2)) {
                 if (data$ndev[i] >= test_bz) {
                   data$outlier[i] <- FALSE
                 }
@@ -763,7 +763,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
           } else {
             if (rankmeth == 1) { #lc, iqx, iqy, nbmes
               #lc
-              new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
+              new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
               if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_mdargos)
                 next
@@ -791,7 +791,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             } else {
               if (rankmeth == 2) { #lc, iqx, nbmes, iqy
                 #lc
-                new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
+                new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
                 if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_mdargos)
                   next
@@ -819,7 +819,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               } else {
                 if (rankmeth == 3) { #lc, nbmes
                   #lc
-                  new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
+                  new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
                   if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                     retained <- rbind(retained, new_mdargos)
                     next
@@ -872,7 +872,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
         } else {
           if (rankmeth == 1) { #lc, iqx, iqy, nbmes
             #lc
-            new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
+            new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
             if (nrow(new_argos) == 1) { #if only one row exists, that is the best
               retained <- rbind(retained, new_argos)
               next
@@ -900,7 +900,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
           } else {
             if (rankmeth == 2) { #lc, iqx, nbmes, iqy
               #lc
-              new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
+              new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
               if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_argos)
                 next
@@ -928,7 +928,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             } else {
               if (rankmeth == 3) { #lc, nbmes
                 #lc
-                new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
+                new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
                 if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_argos)
                   next
@@ -963,35 +963,35 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   #revert lc to characters
   if (nrow(retained) > 0) {
     for (r in 1:nrow(retained)) {
-      if (retained$Quality[r] == 4) {
+      if (retained$LocationQuality[r] == 4) {
         retained$Type[r] <- 'User'
-        retained$Quality[r] <- 'User'
+        retained$LocationQuality[r] <- 'User'
       }
-      if (retained$Quality[r] == -3) {
-        retained$Quality[r] <- 'Z'
+      if (retained$LocationQuality[r] == -3) {
+        retained$LocationQuality[r] <- 'Z'
       }
-      if (retained$Quality[r] == -2) {
-        retained$Quality[r] <- 'B'
+      if (retained$LocationQuality[r] == -2) {
+        retained$LocationQuality[r] <- 'B'
       }
-      if (retained$Quality[r] == -1) {
-        retained$Quality[r] <- 'A'
+      if (retained$LocationQuality[r] == -1) {
+        retained$LocationQuality[r] <- 'A'
       }
     }
   }
   if (nrow(outliers) > 0) {
     for (r in 1:nrow(outliers)) {
-      if (outliers$Quality[r] == -3) {
-        outliers$Quality[r] <- 'Z'
+      if (outliers$LocationQuality[r] == -3) {
+        outliers$LocationQuality[r] <- 'Z'
       }
-      if (outliers$Quality[r] == -2) {
-        outliers$Quality[r] <- 'B'
+      if (outliers$LocationQuality[r] == -2) {
+        outliers$LocationQuality[r] <- 'B'
       }
-      if (outliers$Quality[r] == -1) {
-        outliers$Quality[r] <- 'A'
+      if (outliers$LocationQuality[r] == -1) {
+        outliers$LocationQuality[r] <- 'A'
       }
     }
   }
-  outliers <- outliers[which(outliers$Quality != 4),]
+  outliers <- outliers[which(outliers$LocationQuality != 4),]
 
   #create dataframe with all argos locations
   all <- rbind(outliers, retained)
