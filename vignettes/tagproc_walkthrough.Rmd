@@ -35,6 +35,7 @@ Argos_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164
 
 #run filters
 DF_data <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', keep_lc = 1, maxredun = 3, duplrec = 'offset', minrate = 15, ratecoef = 20, r_only = FALSE)$retained
+FF_data <- freitas.filter(Argos_data, vmax = 2, ang = c(15, 25), distlim = c(2.5, 5))
 GF_data <- gps.filter(GPS_data, min.sat = 5, max.residual = 35)$retained
 ```
 
