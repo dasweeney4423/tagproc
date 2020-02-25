@@ -52,13 +52,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   if (keep_lc %in% c(1:3,'A','B','Z') == FALSE) {
     stop('input for keep_lc is not a real, valid lc')
   }
-  if ((argos_method == 'LS') &
-      ('Latitude1' %in% names(argos) == FALSE) &
-      ('Latitude2' %in% names(argos) == FALSE) &
-      ('Longitude1' %in% names(argos) == FALSE) &
-      ('Longitude2' %in% names(argos) == FALSE)) {
-    stop('lat/lon columns must be labeled like Latitude1 and Latitude2 and Longitude1 and Longitude2')
-  }
+
   #create necessary objects for later
   outliers <- data.frame()
 
@@ -66,26 +60,26 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   if ('POSIXct' %in% class(argos$Date) == FALSE) {
     argos$Date <- as.POSIXct(as.character(argos$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
   }
-  argos$LocationQuality <- as.character(argos$LocationQuality)
+  argos$Quality <- as.character(argos$Quality)
 
   #temporarily change lc letters to numbers to allow for easier comparison
   user <- data.frame()
   for (r in 1:nrow(argos)) {
     if (argos$Type[r] %in% c('User', 'user', 'Deploy', 'deploy', 'DP', NA)) {
-      argos$LocationQuality[r] <- 4
+      argos$Quality[r] <- 4
       user <- rbind(user, argos[r,]) #pull out user defined locations to ensure they are kept after filtering
     }
-    if (argos$LocationQuality[r] == 'Z') {
-      argos$LocationQuality[r] <- -3
+    if (argos$Quality[r] == 'Z') {
+      argos$Quality[r] <- -3
     }
-    if (argos$LocationQuality[r] == 'B') {
-      argos$LocationQuality[r] <- -2
+    if (argos$Quality[r] == 'B') {
+      argos$Quality[r] <- -2
     }
-    if (argos$LocationQuality[r] == 'A') {
-      argos$LocationQuality[r] <- -1
+    if (argos$Quality[r] == 'A') {
+      argos$Quality[r] <- -1
     }
   }
-  argos$LocationQuality <- as.numeric(argos$LocationQuality)
+  argos$Quality <- as.numeric(argos$Quality)
   if (nrow(user) > 0) {
     user$outlier <- FALSE
   }
@@ -128,23 +122,21 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
 
   #find best of primary and alternate locations if data in least-squares argos locations
   if (argos_method == 'LS') {
-    Zclass <- argos[which(argos$LocationQuality == -3),]
+    Zclass <- argos[which(argos$Quality == -3),]
     Zclass$Latitude <- NA
     Zclass$Longitude <- NA
-    user_rows <- argos[which(argos$LocationQuality == -4),]
-    user_rows$Latitude <- user_rows$Latitude1
-    user_rows$Longitude <- user_rows$Longitude1
-    argos <- argos[which(argos$LocationQuality != -3),]
+    argos <- argos[which(argos$Quality != -3),]
 
     #create starting locations and distances/loc-strings
     l1 <- 1
     l2 <- l1 + 1
     while (l2 <= nrow(argos)) {
+      if (l2 == 116) {stop()}
       #get locations
-      loc1p <- c(argos$Longitude1[l1], argos$Latitude1[l1])
-      loc1a <- c(argos$Longitude2[l1], argos$Latitude2[l1])
-      loc2p <- c(argos$Longitude1[l2], argos$Latitude1[l2])
-      loc2a <- c(argos$Longitude2[l2], argos$Latitude2[l2])
+      loc1p <- c(argos$Longitude_p[l1], argos$Latitude_p[l1])
+      loc1a <- c(argos$Longitude_a[l1], argos$Latitude_a[l1])
+      loc2p <- c(argos$Longitude_p[l2], argos$Latitude_p[l2])
+      loc2a <- c(argos$Longitude_a[l2], argos$Latitude_a[l2])
 
       #find four distances from combinations
       distpp <- geosphere::distVincentyEllipsoid(loc1p, loc2p)
@@ -175,25 +167,28 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
         cumap <- windista + distap
         cumaa <- windista + distaa
 
+        wp <- winstrp
+        wa <- winstra
+
         if (cumpp <= cumap) {
-          winstrp <- c(winstrp, 'p')
+          winstrp <- c(wp, 'p')
           windistp <- cumpp
         } else {
-          winstrp <- c(winstra, 'p')
+          winstrp <- c(wa, 'p')
           windistp <- cumap
         }
         if (cumpa <= cumaa) {
-          winstra <- c(winstrp, 'a')
+          winstra <- c(wp, 'a')
           windista <- cumpa
         } else {
-          winstra <- c(winstra, 'a')
+          winstra <- c(wa, 'a')
           windista <- cumaa
         }
       }
 
       #go to next set of locs
-      l1 <- l2
-      l2 <- l1 + 1
+      l1 <- l1 + 1
+      l2 <- l2 + 1
     }
 
     #get shortest string
@@ -206,75 +201,154 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
     #go through argos dataframe and create lat and lon columns for the shortest path
     for (r in 1:nrow(argos)) {
       if (winstring[r] == 'p') {
-        argos$Latitude[r] <- argos$Latitude1[r]
-        argos$Longitude[r] <- argos$Longitude1[r]
+        argos$Latitude[r] <- argos$Latitude_p[r]
+        argos$Longitude[r] <- argos$Longitude_p[r]
       } else {
-        argos$Latitude[r] <- argos$Latitude2[r]
-        argos$Longitude[r] <- argos$Longitude2[r]
+        argos$Latitude[r] <- argos$Latitude_a[r]
+        argos$Longitude[r] <- argos$Longitude_a[r]
       }
     }
 
     #combine argos, user, and Zclass dataframes for next loop
-    if ((nrow(user_rows) > 0) & (nrow(Zclass) > 0)) {
-      argos <- rbind(argos, user_rows, Zclass)
+    if (nrow(Zclass) > 0) {
+      argos <- rbind(argos, Zclass)
       argos <- argos[order(argos$Date),]
-    } else {
-      if (nrow(user_rows) > 0) {
-        argos <- rbind(argos, user_rows)
-        argos <- argos[order(argos$Date),]
-      } else {
-        if (nrow(Zclass) > 0) {
-          argos <- rbind(argos, Zclass)
-          argos <- argos[order(argos$Date),]
-        }
-      }
     }
 
     #perform second pass with user and lc == Z rows included
     if (length(which(is.na(argos$Latitude))) > 0) {
-      for (i in which(is.na(argos$Latitude))) {
-        loc_p <- c(argos$Longitude1[i], argos$Latitude1[i])
-        loc_a <- c(argos$Longitude2[i], argos$Latitude2[i])
-        if (i == 1) {
-          loc_after <- c(argos$Longitude[i+1], argos$Latitude[i+1])
-          distp_after <- geosphere::distVincentyEllipsoid(loc_p, loc_after)
-          dista_after <- geosphere::distVincentyEllipsoid(loc_a, loc_after)
-          if (distp_after <= dista_after) {
-            argos$Latitude[i] <- argos$Latitude1[i]
-            argos$Longitude[i] <- argos$Longitude1[i]
+      #create starting locations and distances/loc-strings
+      l1 <- 1
+      l2 <- l1 + 1
+      winstrp <- winstra <- c()
+      windistp <- windista <- 0
+      while (l2 <= nrow(argos)) {
+        #get locations
+        if (!is.na(argos$Latitude[l1])) {
+          loc1p <- c(argos$Longitude[l1], argos$Latitude[l1])
+          loc1a <- c(argos$Longitude[l1], argos$Latitude[l1])
+        } else {
+          loc1p <- c(argos$Longitude_p[l1], argos$Latitude_p[l1])
+          loc1a <- c(argos$Longitude_a[l1], argos$Latitude_a[l1])
+        }
+        if (!is.na(argos$Latitude[l2])) {
+          loc2p <- c(argos$Longitude[l2], argos$Latitude[l2])
+          loc2a <- c(argos$Longitude[l2], argos$Latitude[l2])
+        } else {
+          loc2p <- c(argos$Longitude_p[l2], argos$Latitude_p[l2])
+          loc2a <- c(argos$Longitude_a[l2], argos$Latitude_a[l2])
+        }
+
+        #find four distances from combinations
+        distpp <- geosphere::distVincentyEllipsoid(loc1p, loc2p)
+        distpa <- geosphere::distVincentyEllipsoid(loc1p, loc2a)
+        distaa <- geosphere::distVincentyEllipsoid(loc1a, loc2a)
+        distap <- geosphere::distVincentyEllipsoid(loc1a, loc2p)
+
+        #create loc-strings
+        if (l1 == 1) { #if this is the first time through the loop create the first two elements of the loc-string
+          if (!is.na(argos$Latitude[l1]) & !is.na(argos$Latitude[l2])) {
+            winstrp <- winstra <- c('done','done')
+            windistp <- windista <- distpp
           } else {
-            argos$Latitude[i] <- argos$Latitude2[i]
-            argos$Longitude[i] <- argos$Longitude2[i]
+            if (!is.na(argos$Latitude[l1])) {
+              winstrp <- c('done', 'p')
+              windistp <- distpp
+              winstra <- c('done', 'a')
+              windista <- distaa
+            } else {
+              if (!is.na(argos$Latitude[l2])) {
+                if (distpp <= distap) {
+                  winstrp <- c('p', 'done')
+                  windistp <- distpp
+                } else {
+                  winstrp <- c('a', 'done')
+                  windistp <- distap
+                }
+                if (distpa <= distaa) {
+                  winstra <- c('p', 'done')
+                  windista <- distpa
+                } else {
+                  winstra <- c('a', 'done')
+                  windista <- distaa
+                }
+              }
+            }
           }
         } else {
-          if (i == nrow(argos)) {
-            loc_before <- c(argos$Longitude[i-1], argos$Latitude[i-1])
-            distp_before <- geosphere::distVincentyEllipsoid(loc_p, loc_before)
-            dista_before <- geosphere::distVincentyEllipsoid(loc_a, loc_before)
-            if (distp_before <= dista_before) {
-              argos$Latitude[i] <- argos$Latitude1[i]
-              argos$Longitude[i] <- argos$Longitude1[i]
+          #find cumulative distances from the best tracks thus far
+          cumpp <- windistp + distpp
+          cumpa <- windistp + distpa
+          cumap <- windista + distap
+          cumaa <- windista + distaa
+
+          if (!is.na(argos$Latitude[l2])) {
+            if (all.equal(cumpp, cumpa, cumaa, cumap)) {
+              winstrp <- c(winstrp, 'done')
+              winstra <- c(winstra, 'done')
+              windistp <- cumpp
+              windista <- cumaa
             } else {
-              argos$Latitude[i] <- argos$Latitude2[i]
-              argos$Longitude[i] <- argos$Longitude2[i]
+              wp <- winstrp
+              wa <- winstra
+
+              if (cumpp <= cumap) {
+                winstrp <- c(wp, 'done')
+                windistp <- cumpp
+              } else {
+                winstrp <- c(wa, 'done')
+                windistp <- cumap
+              }
+              if (cumpa <= cumaa) {
+                winstra <- c(wp, 'done')
+                windista <- cumpa
+              } else {
+                winstra <- c(wa, 'done')
+                windista <- cumaa
+              }
             }
           } else {
-            loc_before <- c(argos$Longitude[i-1], argos$Latitude[i-1])
-            distp_before <- geosphere::distVincentyEllipsoid(loc_p, loc_before)
-            dista_before <- geosphere::distVincentyEllipsoid(loc_a, loc_before)
-            loc_after <- c(argos$Longitude[i+1], argos$Latitude[i+1])
-            distp_after <- geosphere::distVincentyEllipsoid(loc_p, loc_after)
-            dista_after <- geosphere::distVincentyEllipsoid(loc_a, loc_after)
-            dp <- distp_before + distp_after
-            da <- dista_before + dista_after
-            if (dp <= da) {
-              argos$Latitude[i] <- argos$Latitude1[i]
-              argos$Longitude[i] <- argos$Longitude1[i]
+            wp <- winstrp
+            wa <- winstra
+
+            if (cumpp <= cumap) {
+              winstrp <- c(wp, 'p')
+              windistp <- cumpp
             } else {
-              argos$Latitude[i] <- argos$Latitude2[i]
-              argos$Longitude[i] <- argos$Longitude2[i]
+              winstrp <- c(wa, 'p')
+              windistp <- cumap
+            }
+            if (cumpa <= cumaa) {
+              winstra <- c(wp, 'a')
+              windista <- cumpa
+            } else {
+              winstra <- c(wa, 'a')
+              windista <- cumaa
             }
           }
+        }
+
+        #go to next set of locs
+        l1 <- l1 + 1
+        l2 <- l2 + 1
+      }
+
+      #get shortest string
+      if (windistp < windista) {
+        winstring <- winstrp
+      } else {
+        winstring <- winstra
+      }
+
+      #go through argos dataframe and create lat and lon columns for the shortest path
+      for (r in 1:nrow(argos)) {
+        if (winstring[r] == 'done') {next}
+        if (winstring[r] == 'p') {
+          argos$Latitude[r] <- argos$Latitude_p[r]
+          argos$Longitude[r] <- argos$Longitude_p[r]
+        } else {
+          argos$Latitude[r] <- argos$Latitude_a[r]
+          argos$Longitude[r] <- argos$Longitude_a[r]
         }
       }
     }
@@ -284,7 +358,6 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   #######################internal angle function#################################
   ###############################################################################
 
-  #this function is used in the DAR and HYB filters below
   int_ang <- function (locA, locB, locC) {
     bearBA <- geosphere::bearing(locB, locA)
     if (bearBA < 0) {
@@ -385,7 +458,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
       argos$outlier <- filtered
 
       #force locations with lc >= keep_lc to be retained
-      argos$outlier[which(argos$LocationQuality >= keep_lc)] <- FALSE
+      argos$outlier[which(argos$Quality >= keep_lc)] <- FALSE
 
       #force last location to be retained if desired
       if (keeplast == TRUE) {
@@ -451,7 +524,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
 
           #step 2
           if (skip == FALSE) {
-            if (subargos$LocationQuality[rB] >= keep_lc) {
+            if (subargos$Quality[rB] >= keep_lc) {
               subargos$outlier[rB] <- FALSE
               skip <- TRUE
             }
@@ -466,6 +539,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               if ((distBC != 0) & (distAB != 0)) {
                 alpha <- int_ang(locA, locB, locC) #see above for code
                 minAlpha <- abs(-25 + ratecoef * log(min(distAB, distBC)))
+                subargos$anglediff[rB] <- alpha-minAlpha
                 if (alpha < minAlpha) {
                   subargos$outlier[rB] <- TRUE
                   skip <- TRUE
@@ -512,17 +586,21 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
           if (is.na(subargos$outlier[rB])) { #if location set did not trigger any of the steps, location B is retained
             subargos$outlier[rB] <- FALSE
           }
-          if (subargos$outlier[rB] == TRUE) {
-            rA <- rC
-            rB <- rA + 1
-            rC <- rB + 1
-            rD <- rC + 1
-          } else {
-            rA <- rB
-            rB <- rA + 1
-            rC <- rB + 1
-            rD <- rC + 1
-          }
+          rA <- rB
+          rB <- rA + 1
+          rC <- rB + 1
+          rD <- rC + 1
+          # if (subargos$outlier[rB] == TRUE) {
+          #   rA <- rC
+          #   rB <- rA + 1
+          #   rC <- rB + 1
+          #   rD <- rC + 1
+          # } else {
+          #   rA <- rB
+          #   rB <- rA + 1
+          #   rC <- rB + 1
+          #   rD <- rC + 1
+          # }
         }
 
         #apply filtering results to argos dataframe
@@ -604,7 +682,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               #test 1: directional deviation
               beari <- geosphere::bearing(locstart, loci)
               bearse <- geosphere::bearing(locstart, locend)
-              #the heading of the vector Xo-Xi must be within ±xdirect degrees of the heading of the vector Xo-Xn
+              #the heading of the vector Xo-Xi must be within ?xdirect degrees of the heading of the vector Xo-Xn
               if (abs(beari - bearse) <= xdirect) {
                 data$ndev[i] <- data$ndev[i] + 1
               }
@@ -626,7 +704,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               }
 
               #retain or filter based on lc and other inputs
-              if (data$LocationQuality[i] %in% c(-3, -2)) {
+              if (data$Quality[i] %in% c(-3, -2)) {
                 if (data$ndev[i] >= test_bz) {
                   data$outlier[i] <- FALSE
                 }
@@ -685,7 +763,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
           } else {
             if (rankmeth == 1) { #lc, iqx, iqy, nbmes
               #lc
-              new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
+              new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
               if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_mdargos)
                 next
@@ -713,7 +791,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             } else {
               if (rankmeth == 2) { #lc, iqx, nbmes, iqy
                 #lc
-                new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
+                new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
                 if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_mdargos)
                   next
@@ -741,7 +819,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               } else {
                 if (rankmeth == 3) { #lc, nbmes
                   #lc
-                  new_mdargos <- mdargos[which(mdargos$LocationQuality == max(mdargos$LocationQuality)),]
+                  new_mdargos <- mdargos[which(mdargos$Quality == max(mdargos$Quality)),]
                   if (nrow(new_mdargos) == 1) { #if only one row exists, that is the best
                     retained <- rbind(retained, new_mdargos)
                     next
@@ -794,7 +872,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
         } else {
           if (rankmeth == 1) { #lc, iqx, iqy, nbmes
             #lc
-            new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
+            new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
             if (nrow(new_argos) == 1) { #if only one row exists, that is the best
               retained <- rbind(retained, new_argos)
               next
@@ -822,7 +900,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
           } else {
             if (rankmeth == 2) { #lc, iqx, nbmes, iqy
               #lc
-              new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
+              new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
               if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                 retained <- rbind(retained, new_argos)
                 next
@@ -850,7 +928,7 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
             } else {
               if (rankmeth == 3) { #lc, nbmes
                 #lc
-                new_argos <- new_argos[which(new_argos$LocationQuality == max(new_argos$LocationQuality)),]
+                new_argos <- new_argos[which(new_argos$Quality == max(new_argos$Quality)),]
                 if (nrow(new_argos) == 1) { #if only one row exists, that is the best
                   retained <- rbind(retained, new_argos)
                   next
@@ -885,35 +963,35 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   #revert lc to characters
   if (nrow(retained) > 0) {
     for (r in 1:nrow(retained)) {
-      if (retained$LocationQuality[r] == 4) {
+      if (retained$Quality[r] == 4) {
         retained$Type[r] <- 'User'
-        retained$LocationQuality[r] <- 'User'
+        retained$Quality[r] <- 'User'
       }
-      if (retained$LocationQuality[r] == -3) {
-        retained$LocationQuality[r] <- 'Z'
+      if (retained$Quality[r] == -3) {
+        retained$Quality[r] <- 'Z'
       }
-      if (retained$LocationQuality[r] == -2) {
-        retained$LocationQuality[r] <- 'B'
+      if (retained$Quality[r] == -2) {
+        retained$Quality[r] <- 'B'
       }
-      if (retained$LocationQuality[r] == -1) {
-        retained$LocationQuality[r] <- 'A'
+      if (retained$Quality[r] == -1) {
+        retained$Quality[r] <- 'A'
       }
     }
   }
   if (nrow(outliers) > 0) {
     for (r in 1:nrow(outliers)) {
-      if (outliers$LocationQuality[r] == -3) {
-        outliers$LocationQuality[r] <- 'Z'
+      if (outliers$Quality[r] == -3) {
+        outliers$Quality[r] <- 'Z'
       }
-      if (outliers$LocationQuality[r] == -2) {
-        outliers$LocationQuality[r] <- 'B'
+      if (outliers$Quality[r] == -2) {
+        outliers$Quality[r] <- 'B'
       }
-      if (outliers$LocationQuality[r] == -1) {
-        outliers$LocationQuality[r] <- 'A'
+      if (outliers$Quality[r] == -1) {
+        outliers$Quality[r] <- 'A'
       }
     }
   }
-  outliers <- outliers[which(outliers$LocationQuality != 4),]
+  outliers <- outliers[which(outliers$Quality != 4),]
 
   #create dataframe with all argos locations
   all <- rbind(outliers, retained)
@@ -922,6 +1000,11 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
   outliers <- outliers[order(outliers$Date),]
   retained <- retained[order(retained$Date),]
   all <- all[order(all$Date),]
+  suppressWarnings(suppressPackageStartupMessages(require(tidyverse)))
+  outliers <- outliers %>% distinct()
+  retained <- retained %>% distinct()
+  all <- all %>% distinct()
+
 
   #return list of all, retained, and outliers
   return(list(all = all, retained = retained, outliers = outliers))
