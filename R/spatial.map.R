@@ -6,10 +6,9 @@
 #' @param size A vector the same size as the number of spatial object inputs that specifies the size desired for each of the objects in the order they are given.
 #' @param title A main title to be made for the figure
 #' @param subtitle A subtitle to be made for the figure
-#' @param crs
 #' @examples #examples not yet provided, sorry :(
 
-spatial.map <- function(..., color = NULL, size = NULL, title = NULL, subtitle = NULL, crs = NULL) {
+spatial.map <- function(..., color = NULL, size = NULL, title = NULL, subtitle = NULL) {
   if (!is.null(color)) {
     if (length(color) != ...length()) {
       stop('number of color inputs must match the number of spatial object inputs')
@@ -30,18 +29,6 @@ spatial.map <- function(..., color = NULL, size = NULL, title = NULL, subtitle =
 
   for (l in 1:...length()) {
     data.layer <- list(...)[[l]]
-    if (!is.null(crs)) {
-      data.layer <- sp::spTransform(data.layer, sp::CRS(crs))
-    } else {
-      if (l == 1) {
-        crs1 <- sp::proj4string(data.layer)
-      } else {
-        if (sp::proj4string(data.layer) != crs1) {
-          data.layer <- sp::spTransform(data.layer, sp::CRS(crs1))
-        }
-      }
-    }
-
     if (class(data.layer) == "SpatialPolygonsDataFrame") {
       p <- p + ggspatial::layer_spatial(data = data.layer, size = size[l], color = color[l], spatial.fill = 'transparent')
     } else {
