@@ -21,13 +21,10 @@ spatial.map <- function(..., color = NULL, size = NULL, title = NULL, subtitle =
       }
     }
 
-    if (class(data.layer) == "SpatialPoints") {
-      p <- p + ggspatial::layer_spatial(data = data.layer, color = color[l], size = size[l])
+    if (class(data.layer) == "SpatialPolygonsDataFrame") {
+      p <- p + ggspatial::layer_spatial(data = data.layer, size = size[l], color = color[l], spatial.fill = 'transparent')
     } else {
-      if (class(data.layer) == "SpatialPolygonsDataFrame") {
-
-        p <- p + ggspatial::layer_spatial(data = data.layer, size = size[l], color = color[l], spatial.fill = 'transparent')
-      }
+      p <- p + ggspatial::layer_spatial(data = data.layer, color = color[l], size = size[l])
     }
   }
 
