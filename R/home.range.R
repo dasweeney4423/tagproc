@@ -9,7 +9,7 @@
 #' @return A list containing each of the home range estimation levels
 #' @examples #examples not yet provided, sorry :(
 
-home.range(data, perc = c(50, 95), kernel.method = 'href', unout = 'km2', process.tz = NULL) {
+home.range <- function(data, perc = c(50, 95), kernel.method = 'href', unout = 'km2', process.tz = NULL) {
   if (!is.null(process.tz)) {
     #convert Dates and times into class POSIXct Datetime and convert lc to characters
     if ('POSIXct' %in% class(data$Date) == FALSE) {
