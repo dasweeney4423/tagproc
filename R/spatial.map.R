@@ -1,7 +1,7 @@
 #' Plot spatial data on map
 #'
 #' This function is able to take many different spatial objects and plot them on an esri map.
-#' @param ... Spatial objects that you wish to plot. Can be linestrings, points, polygons...
+#' @param ... Spatial objects that you wish to plot. Can be linestrings, points, polygons... Please make sure your projections are as you want them to be.
 #' @param color A vector the same size as the number of spatial object inputs that specifies the color desired for each of the objects in the order they are given.
 #' @param size A vector the same size as the number of spatial object inputs that specifies the size desired for each of the objects in the order they are given.
 #' @param title A main title to be made for the figure
