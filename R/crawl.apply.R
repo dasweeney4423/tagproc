@@ -350,6 +350,6 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
                      mr[,c(8:34)])
     names(mr)[which(names(mr) == "msg")] <- "MsgCount"
 
-    return(mr)
+    return(list(data = mr, points = m$geometry, lines = sf_pred_lines$.))
   } # end of if nrow(data) > 0
 }
