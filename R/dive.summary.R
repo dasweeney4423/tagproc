@@ -12,7 +12,7 @@ dive.summary <- function(dive, summfile = NULL, forage.cutoff = 600) {
   dive$DepthAvg <- as.numeric(as.character(dive$DepthAvg))
   dive$Event <- as.character(dive$Event)
 
-  ID <- deployid
+  ID <- dive$TagID[1]
   N.records <- nrow(dive)
   Tot.t <- round(as.numeric(difftime(dive$StartTime[nrow(dive)], dive$StartTime[1], units = "hours")), digits = 1)
 
