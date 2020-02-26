@@ -81,7 +81,14 @@ split_Beh <- split.dive.msg(Beh_data, kclusters = 2)
 diveplot(split_Beh$Dives)
 ```
 
-Next, we can visualize the solar and lunar data associated with our tagged whale's diving behavior.
+Now that we see what the dive profile looks like, we can also look at some simple summary stats found by the dive.summary tool. We will allow for kmeans analysis to separate deep/long from shallow/short dives.
+
+```{r}
+#collect summary data
+dive.summary(split_Beh$Dives, forage.cutoff = 'kmeans')
+```
+
+Next, we can visualize the solar and lunar data associated with our tagged whale's diving behavior. Because bhr.interpolate only pulls prior locations and future locations, not the closest location in time regardless, the first few dives will not be shown as no location data is associated with them.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #associate CRAWL locations with diving behavior
