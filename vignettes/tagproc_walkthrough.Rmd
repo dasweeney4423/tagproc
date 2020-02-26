@@ -50,22 +50,27 @@ CRAWL_data <- crawl.apply(DF_data, model.interval = '30 mins',
 
 Now we can plot the CRAWL data to see how it looks.
 
-```{r, fig.height=4, fig.width=4, fig.align='center'}
+```{r, fig.height=4, fig.width=7, fig.align='center'}
 tag.mapper(CRAWL_data$data, zoom = 1, lon.offset = 0, lat.offset = 0,
                        lwd = .5, pch = 1, cex = .5, col = "black", 
                        mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
 
-We can also plot the animal track on a map after converting our data to a spatial object.
+We can also plot the animal track on a map after converting our data to a spatial object. Additionally, we can calculate a home range estimate and add that to the map.
 
-```{r, fig.height=4, fig.width=4, fig.align='center'}
-spatial.map(CRAWL_data$lines, CRAWL_data$points, color = c('red','black'), 
-            size = c(1.5, .25), title = 'Animal Track', subtitle = 'CRAWL')
+```{r, fig.height=4, fig.width=7, fig.align='center'}
+#find home ranges (95% and 50%)
+HR_data <- home.range(DF_data, perc = c(50, 95), kernel.method = 'href', unout = 'km2')
+
+#plot all data
+spatial.map(CRAWL_data$lines, CRAWL_data$points, HR_data[[1]], HR_data[[2]], 
+            color = c('red','black', 'orange' ,'yellow'), 
+            size = c(1.5, .25, 1, 1), title = 'KDE Home Ranges', subtitle = '95% and 50%')
 ```
 
 We should also view a the dive profile of this individual. However, before we do that we should split our dive behavior file into dive data and message data.
 
-```{r, fig.height=4, fig.width=4, fig.align='center'}
+```{r, fig.height=4, fig.width=7, fig.align='center'}
 #pull in data
 Beh_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164613-Behavior.csv")
 
@@ -78,16 +83,10 @@ diveplot(split_Beh$Dives)
 
 Next, we can visualize the solar and lunar data associated with our tagged whale's diving behavior.
 
-```{r}
-#associate CRAWL locations with dives
-DIVE_data <- split_Beh$Dives
-DIVE_data$Latitude <- DIVE_data$Longitude <- NA
-for (i in 1:nrow(DIVE_data)) {
-  diffs <- abs(as.numeric(DIVE_data$StartTime[i]) - as.numeric(CRAWL_data$data$Date))
-  wd <- which(diffs == min(diffs))
-  DIVE_data$Latitude[i] <- mean(CRAWL_data$data$Latitude[wd])
-  DIVE_data$Longitude[i] <- mean(CRAWL_data$data$Longitude[wd])
-}
+```{r, fig.height=4, fig.width=7, fig.align='center'}
+#associate CRAWL locations with diving behavior
+# and crop data to only dives that go below 800m depth
+DIVE_data <- bhvr.interpolate(split_Beh$Dives, CRAWL_data$data)
 DIVE_data <- DIVE_data[which(DIVE_data$DepthAvg > 800),]
 
 #get solar and lunar data
@@ -99,7 +98,7 @@ plot.sunmoon(SL_data, xlab = 'Deep Dive Number')
 
 We can also view bathymetry data in association with our tag data.
 
-```{r}
+```{r, fig.height=4, fig.width=7, fig.align='center'}
 #collect bathymetry data
 BATHY_data <- bathy.sync(SL_data, z.radius = .25)
 
