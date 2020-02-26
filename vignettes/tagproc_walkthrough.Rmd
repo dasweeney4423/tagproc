@@ -56,7 +56,7 @@ tag.mapper(CRAWL_data$data, zoom = 1, lon.offset = 0, lat.offset = 0,
                        mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
 
-As mentioned above, we can also plot the animal track on a map after converting our data to a spatial object. Additionally, we can calculate a home range estimates and add them to the map.
+As mentioned above, we can also plot the animal track on a map after converting our data to a spatial object. Additionally, we can calculate a home range estimates and add them to the map. Before using the `spatial.map` function, however, you need to make sure you have internet connection as the topography data is pulled from the internet upon calling this funtion.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #find home ranges (95% and 50%)
@@ -88,7 +88,7 @@ Now that we see what the dive profile looks like, we can also look at some simpl
 dive.summary(split_Beh$Dives, forage.cutoff = 'kmeans')
 ```
 
-Next, we can visualize the solar and lunar data associated with our tagged whale's diving behavior. Because bhr.interpolate only pulls prior locations and future locations, not the closest location in time regardless, the first few dives will not be shown as no location data is associated with them.
+Next, we can visualize the solar and lunar data associated with our tagged whale's diving behavior. Because `bhr.interpolate` only pulls prior locations and future locations, not the closest location in time regardless, the first few dives will not be shown as no location data is associated with them.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #associate CRAWL locations with diving behavior
