@@ -17,7 +17,7 @@ home.range <- function(data, perc = c(50, 95), kernel.method = 'href', unout = '
     }
 
     #process data
-    data$localtime <- with_tz(data$Date, tzone = process.tz)
+    data$localtime <- lubridate::with_tz(data$Date, tzone = process.tz)
     data$local_yday <- as.character(as.POSIXlt(data$localtime)$yday + 1)
     data$local_year <- as.character(as.POSIXlt(data$localtime)$year + 1900)
     data$local_month <- as.character(as.POSIXlt(data$localtime)$mon + 1)
@@ -55,13 +55,15 @@ home.range <- function(data, perc = c(50, 95), kernel.method = 'href', unout = '
         }
       }
     }
+  } else {
+    ppdata <- data
   }
 
   #First, create a spatial points variable for lon and Latitude so that R recognizes these two columns as geographic coordinates:
   data.sp <- sp::SpatialPoints(ppdata[c("Longitude", "Latitude")])
   #Make sure the variable is projected as CRS = WGS84
-  proj4string(data.sp) = sp::CRS("+init=epsg:4326")
-  data.sp <- sp::spTransform(data.sp, CRS("+init=epsg:4326"))
+  sp::proj4string(data.sp) = sp::CRS("+init=epsg:4326")
+  data.sp <- sp::spTransform(data.sp, sp::CRS("+init=epsg:4326"))
 
   #Estimate home range KDE using the getveticshr function:
   data.kde <- adehabitatHR::kernelUD(data.sp, h = kernel.method)
