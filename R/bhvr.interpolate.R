@@ -1,3 +1,11 @@
+#' Associate location data with behavioral data
+#'
+#' Combines location data and behavioral data in order to associate locations with all desired behaviors for both the start and end of the behaviors
+#' @param data A dataframe containing the behavioral data to which locations will be associated
+#' @param locs A dataframe containing the locations/animal track from which all locations will be obtained
+#' @return A dataframe similar to the input for "data", but extra columns will be attached containing associated location and movement data for the animal.
+#' @examples #examples not yet provided, sorry :(
+
 bhvr.interpolate <- function(data, locs) {
   # Format bhvr logs
   data$StartTime <- time.turner(data$StartTime)$strp
