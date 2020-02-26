@@ -1,11 +1,12 @@
-#' Plot environmental data
+#' Plot solar and lunar environmental data
 #'
 #' Plot environmental data that has been collected from the sun.moon() function
 #' @param data A dataframe obtained after using the sun.moon() function that contains environmental data associated with tag data
+#' @param xlab Optional input to specify desired x-axis label for the plot. Default is "Location Record"
 #' @return A multipanelled figure plotting important environmental variables
 #' @examples #examples not yet provided, sorry :(
 
-plot.sunmoon <- function(data) {
+plot.sunmoon <- function(data, xlab = "Location Record") {
   par(mfrow = c(4, 1))
   par(mar=c(.5,6,.5,.5), oma=c(4,2,2,2))
   cex.scale = 1
@@ -26,5 +27,5 @@ plot.sunmoon <- function(data) {
   axis(2, las = 2, cex.axis = cex.scale)
   axis(1, cex.axis = cex.scale)
   title(ylab = "Moon\nPhase", cex.lab = cex.scale)
-  title(xlab = "Dive record", cex.lab = cex.scale, outer=T, line = 2)
+  title(xlab = xlab, cex.lab = cex.scale, outer=T, line = 2)
 }
