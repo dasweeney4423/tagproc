@@ -24,9 +24,9 @@ ZcTag059_folder <- "C:/Users/marec/Docs/ZcTag059-Portal-Folder"
 prettifyWC(ZcTag059_folder)
 ```
 
-The new folder that is created is located within the tag data folder and is names WC-pretty. Opening up this new folder, you will see the same data files, but they will have been cleaned and prettified. 
+The new folder that is created is located within the tag data folder and is named WC-pretty. Opening up this new folder, you will see the same data files, but they will have been cleaned and prettified. 
 
-We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter on the argos data and a basic GPS filter on our GPS data.
+We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter and Freitas filter on the argos data and a basic GPS filter on our GPS data.
 
 ```{r}
 #pull in data
@@ -41,14 +41,14 @@ FF_data <- freitas.filter(Argos_data, vmax = 2, ang = c(15, 25), distlim = c(2.5
 GF_data <- gps.filter(GPS_data, min.sat = 5, max.residual = 35)$retained
 ```
 
-I will not create an estimated track from a CRAWL model:
+I will now create an estimated track from a CRAWL model. The estimated track can have locations predicted for different time intervals. Here I will be using a 30 minute interval. See the crawl package for more options on possible time intervals.
 
 ```{r}
 CRAWL_data <- crawl.apply(DF_data, model.interval = '30 mins', 
                           crs = 2230, land.adjust = NULL, img.path = NULL)
 ```
 
-Now we can plot the CRAWL data to see how it looks.
+Now we can plot the CRAWL data to see how it looks. This plotting tool is the most basic location plotting tool in the package. Later on, we will use the `spatial.map` function to plot our data over ocean topography.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 tag.mapper(CRAWL_data$data, zoom = 1, lon.offset = 0, lat.offset = 0,
@@ -56,7 +56,7 @@ tag.mapper(CRAWL_data$data, zoom = 1, lon.offset = 0, lat.offset = 0,
                        mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
 
-We can also plot the animal track on a map after converting our data to a spatial object. Additionally, we can calculate a home range estimate and add that to the map.
+As mentioned above, we can also plot the animal track on a map after converting our data to a spatial object. Additionally, we can calculate a home range estimates and add them to the map.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #find home ranges (95% and 50%)
@@ -68,7 +68,7 @@ spatial.map(CRAWL_data$lines, CRAWL_data$points, HR_data[[1]], HR_data[[2]],
             size = c(1.5, .25, 1, 1), title = 'KDE Home Ranges', subtitle = '95% and 50%')
 ```
 
-We should also view a the dive profile of this individual. However, before we do that we should split our dive behavior file into dive data and message data.
+We should also view the dive profile of this individual. However, before we do that we should split our dive behavior file into dive data and message data using the `split.dive.msg` function in this package.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #pull in data
