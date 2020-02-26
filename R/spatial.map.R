@@ -30,7 +30,7 @@ spatial.map <- function(..., color = NULL, size = NULL, title = NULL, subtitle =
   for (l in 1:...length()) {
     data.layer <- list(...)[[l]]
     if ("SpatialPolygonsDataFrame" %in% class(data.layer)) {
-      p <- p + ggspatial::layer_spatial(data = data.layer, size = size[l], color = color[l], spatial.fill = 'transparent')
+      p <- p + ggspatial::layer_spatial(data = data.layer, size = size[l], color = color[l], fill = 'transparent')
     } else {
       p <- p + ggspatial::layer_spatial(data = data.layer, color = color[l], size = size[l])
     }
