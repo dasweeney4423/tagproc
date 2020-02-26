@@ -88,16 +88,21 @@ for (i in 1:nrow(DIVE_data)) {
   DIVE_data$Latitude[i] <- mean(CRAWL_data$data$Latitude[wd])
   DIVE_data$Longitude[i] <- mean(CRAWL_data$data$Longitude[wd])
 }
+DIVE_data <- DIVE_data[which(DIVE_data$DepthAvg > 800),]
 
 #get solar and lunar data
 SL_data <- sun.moon(DIVE_data)
 
 #plot it 
-plot.sunmoon(SL_data)
+plot.sunmoon(SL_data, xlab = 'Deep Dive Number')
 ```
 
 We can also view bathymetry data in association with our tag data.
 
 ```{r}
-bathy.sync(CRAWL_data$data, z.radius = .25)
+#collect bathymetry data
+BATHY_data <- bathy.sync(SL_data, z.radius = .25)
+
+#plot data
+plot.seafloor(BATHY_data, xlab = "Deep Dive Number")
 ```
