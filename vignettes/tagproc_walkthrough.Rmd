@@ -68,6 +68,16 @@ spatial.map(CRAWL_data$lines, CRAWL_data$points, HR_data[[1]], HR_data[[2]],
             size = c(1.5, .25, 1, 1), title = 'KDE Home Ranges', subtitle = '95% and 50%')
 ```
 
+We can also use the `polyprox` and `plot.polygons` functions to plot animal tracks over desired spatial polygons. The `polyprox` tool first is used to gather data on the proximity of each whale location to the polygons provided, and then the `plot.polygons` tool takes the same data, plots it, and marks the locations when the whale was within each of the polygons. The `plot.polygons` function can be run with tag location data that is not the output of the `polyprox` function, but in this case the locations within each of the polygons will not be marked.
+
+```{r}
+#get polygon proximity data
+POLY_data <- polyprox(DF_data, polypath = "C:/Users/marec/Docs/TagProcApp-20180519/20180519/Resources-Polygons")
+
+#plot polygon data
+plot.polygons(POLY_data, polypath = "C:/Users/marec/Docs/TagProcApp-20180519/20180519/Resources-Polygons")
+```
+
 We should also view the dive profile of this individual. However, before we do that we should split our dive behavior file into dive data and message data using the `split.dive.msg` function in this package.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
