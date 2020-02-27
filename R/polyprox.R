@@ -7,7 +7,8 @@ polyprox <- function(data, poly) {
   if (length(polylf) == 0) {
     polyname <- poly
     # Load polygon
-    polj <- rgdal::readOGR(dsn = polyname)
+    polj <- suppressWarnings(rgdal::readOGR(dsn = polyname))
+    polyname <- strsplit(polyname,'/')[[1]][length(strsplit(polyname,'/')[[1]])]
 
     # Loop through each GPS record
     polydist <- rep(NA, times = nrow(data))
@@ -23,7 +24,7 @@ polyprox <- function(data, poly) {
         sp::proj4string(coord) <- sp::proj4string(polj)
 
         # Test whether point is in polygon (if FALSE, it is not)
-        inpoly <- !is.na(over(coord, as(polj, "SpatialPolygons")))
+        inpoly <- !is.na(sp::over(coord, as(polj, "SpatialPolygons")))
         if (inpoly) {
           polydist[i] <- 0 # If pt is in polygon, set distance to 0
         } else {
@@ -36,13 +37,14 @@ polyprox <- function(data, poly) {
 
     # Add distance vector to GPS dataframe
     data$poly <- polydist
-    names(data)[which(names(data) == "poly")] <- polynames
+    names(data)[which(names(data) == "poly")] <- polyname
   } else {
     # Loop through each Polygon
     for (j in 1:length(polylf)) {
       # Load polygon j
       polyname <- paste0(poly, "/", polylf[j])
-      polj <- rgdal::readOGR(dsn = polyname)
+      polj <- suppressWarnings(rgdal::readOGR(dsn = polyname))
+      polyname <- strsplit(polyname,'/')[[1]][length(strsplit(polyname,'/')[[1]])]
 
       # Loop through each GPS record
       polydist <- rep(NA, times = nrow(data))
@@ -58,7 +60,7 @@ polyprox <- function(data, poly) {
           sp::proj4string(coord) <- sp::proj4string(polj)
 
           # Test whether point is in polygon (if FALSE, it is not)
-          inpoly <- !is.na(over(coord, as(polj, "SpatialPolygons")))
+          inpoly <- !is.na(sp::over(coord, as(polj, "SpatialPolygons")))
           if (inpoly) {
             polydist[i] <- 0 # If pt is in polygon, set distance to 0
           } else {
@@ -71,7 +73,7 @@ polyprox <- function(data, poly) {
 
       # Add distance vector to GPS dataframe
       data$poly <- polydist
-      names(data)[which(names(data) == "poly")] <- polynames[j]
+      names(data)[which(names(data) == "poly")] <- polyname
     } # end of polygon loop
   }
 
