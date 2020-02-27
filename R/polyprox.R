@@ -15,7 +15,7 @@ polyprox <- function(data, polypath) {
   if (length(polylf) == 0) {
     polyname <- polypath
     # Load polygon
-    polj <- suppressWarnings(rgdal::readOGR(dsn = polyname))
+    polj <- suppressWarnings(rgdal::readOGR(dsn = polyname, verbose = F))
     polyname <- strsplit(polyname,'/')[[1]][length(strsplit(polyname,'/')[[1]])]
 
     # Loop through each GPS record
@@ -51,7 +51,7 @@ polyprox <- function(data, polypath) {
     for (j in 1:length(polylf)) {
       # Load polygon j
       polyname <- paste0(polypath, "/", polylf[j])
-      polj <- suppressWarnings(rgdal::readOGR(dsn = polyname))
+      polj <- suppressWarnings(rgdal::readOGR(dsn = polyname, verbose = F))
       polyname <- strsplit(polyname,'/')[[1]][length(strsplit(polyname,'/')[[1]])]
 
       # Loop through each GPS record
