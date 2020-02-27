@@ -1,3 +1,11 @@
+#' Determine proximity to polygons
+#'
+#' This tool takes location data and determines the proximity of each location to the polygon(s) provided as .kmls
+#' @param data A dataframe containing the location data for which proximities will be given for each polygon
+#' @param polypath File path to either a folder containing many kml files (the folder cannot contain any other types of files) or the path to a single kml file
+#' @return A dataframe similar to the input for "data", but extra columns will be attached containing associated proximities to the polygons (in km)
+#' @examples #examples not yet provided, sorry :(
+
 polyprox <- function(data, polypath) {
   # Format pos/bhvr data
   LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
