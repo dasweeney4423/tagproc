@@ -1,11 +1,11 @@
-polyprox <- function(data, poly) {
+polyprox <- function(data, polypath) {
   # Format pos/bhvr data
   LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
   LON <- data[, which(names(data) %in% c("Longitude", "StartLon"))]
 
-  polylf <- list.files(poly)
+  polylf <- list.files(polypath)
   if (length(polylf) == 0) {
-    polyname <- poly
+    polyname <- polypath
     # Load polygon
     polj <- suppressWarnings(rgdal::readOGR(dsn = polyname))
     polyname <- strsplit(polyname,'/')[[1]][length(strsplit(polyname,'/')[[1]])]
@@ -42,7 +42,7 @@ polyprox <- function(data, poly) {
     # Loop through each Polygon
     for (j in 1:length(polylf)) {
       # Load polygon j
-      polyname <- paste0(poly, "/", polylf[j])
+      polyname <- paste0(polypath, "/", polylf[j])
       polj <- suppressWarnings(rgdal::readOGR(dsn = polyname))
       polyname <- strsplit(polyname,'/')[[1]][length(strsplit(polyname,'/')[[1]])]
 
