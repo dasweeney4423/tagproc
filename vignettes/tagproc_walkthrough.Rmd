@@ -17,16 +17,18 @@ knitr::opts_chunk$set(
 R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
 ```
 
-In this tutorial, we will be using data from ZcTag059. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made.
+The goal of this package is, as the title suggests, to help users of Wildlife Computers tag data get their data processed and ready for analysis. This package is designed to clean up your data, filter it, and allow for initial data exploration. This package is a constant work in progress as we hope to be able to include more tools as we get more ideas and receive feedback from you. So please, be thinking of ways to improve this package as you begin to read this tutorial and ultimately use the package.
+
+In this tutorial, we will be using data from a Cuvier's beaked whale, tag ID ZcTag059, tagged off the coast of Southern California. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made.
 
 ```{r}
 ZcTag059_folder <- "C:/Users/marec/Docs/ZcTag059-Portal-Folder"
 prettifyWC(ZcTag059_folder)
 ```
 
-The new folder that is created is located within the tag data folder and is named WC-pretty. Opening up this new folder, you will see the same data files, but they will have been cleaned and prettified. 
+The new folder that is created is located within the tag data folder and is named WC-pretty. Opening up this new folder, you will see the same data files, but they will have been organized. 
 
-We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter and Freitas filter on the argos data and a basic GPS filter on our GPS data.
+We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter and Freitas filter on the argos data and a basic GPS filter (filtering locations by residual values and satellite numbers) on our GPS data.
 
 ```{r}
 #pull in data
@@ -37,15 +39,14 @@ Argos_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164
 DF_data <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', 
                           keep_lc = 1, maxredun = 3, duplrec = 'offset', 
                           minrate = 15, ratecoef = 20, r_only = FALSE)$retained
-FF_data <- freitas.filter(Argos_data, vmax = 2, ang = c(15, 25), distlim = c(2.5, 5))
-GF_data <- gps.filter(GPS_data, min.sat = 5, max.residual = 35)$retained
+FF_data <- freitas.filter(Argos_data, vmax = 2, ang = c(15, 25), distlim = c(2.5, 5))$retained
+GF_data <- gps.filter(GPS_data, max.te = 3 , max.residual = 35)$retained
 ```
 
-I will now create an estimated track from a CRAWL model. The estimated track can have locations predicted for different time intervals. Here I will be using a 30 minute interval. See the crawl package for more options on possible time intervals.
+I will now create an estimated track from a continuous-time correlated random walk model. The estimated track can have locations predicted for different time intervals. Here I will be using a 30 minute interval. See the 'crawl' package for more options on possible time intervals.
 
 ```{r}
-CRAWL_data <- crawl.apply(DF_data, model.interval = '30 mins', 
-                          crs = 2230, land.adjust = NULL, img.path = NULL)
+CRAWL_data <- crawl.apply(DF_data, model.interval = '30 mins', crs = 2230)
 ```
 
 Now we can plot the CRAWL data to see how it looks. This plotting tool is the most basic location plotting tool in the package. Later on, we will use the `spatial.map` function to plot our data over ocean topography.
@@ -56,7 +57,7 @@ tag.mapper(CRAWL_data$data, zoom = 1, lon.offset = 0, lat.offset = 0,
                        mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
 
-As mentioned above, we can also plot the animal track on a map after converting our data to a spatial object. Additionally, we can calculate a home range estimates and add them to the map. Before using the `spatial.map` function, however, you need to make sure you have internet connection as the topography data is pulled from the internet upon calling this funtion.
+As mentioned, we can also plot the animal track on a map after converting our data to a spatial object. Luckily, part of the `crawl.apply` function's output is contains the estimated animal locations as spatial objects, which we an directly input to the `spatial.map` tool. Additionally, we can calculate home range estimates and add them to the map. Before using the `spatial.map` function, however, you need to make sure you have internet connection as the topography data is pulled from the internet upon calling this function.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #find home ranges (95% and 50%)
@@ -68,9 +69,9 @@ spatial.map(CRAWL_data$lines, CRAWL_data$points, HR_data[[1]], HR_data[[2]],
             size = c(1.5, .25, 1, 1), title = 'KDE Home Ranges', subtitle = '95% and 50%')
 ```
 
-We can also use the `polyprox` and `plot.polygons` functions to plot animal tracks over desired spatial polygons. The `polyprox` tool first is used to gather data on the proximity of each whale location to the polygons provided, and then the `plot.polygons` tool takes the same data, plots it, and marks the locations when the whale was within each of the polygons. The `plot.polygons` function can be run with tag location data that is not the output of the `polyprox` function, but in this case the locations within each of the polygons will not be marked.
+We can also use the `polyprox` and `plot.polygons` functions to plot animal tracks over desired spatial polygons. The `polyprox` tool is used to gather data on the proximity of each whale location to the polygons provided, and then the `plot.polygons` tool takes the same data, plots it, and marks the locations when the whale was within each of the polygons. The `plot.polygons` function can be run with tag location data that is not the output of the `polyprox` function, but in these cases the locations within each of the polygons will not be marked.
 
-```{r}
+```{r, fig.height=4, fig.width=7, fig.align='center'}
 #get polygon proximity data
 POLY_data <- polyprox(DF_data, polypath = "C:/Users/marec/Docs/TagProcApp-20180519/20180519/Resources-Polygons")
 
@@ -91,7 +92,7 @@ split_Beh <- split.dive.msg(Beh_data, kclusters = 2)
 diveplot(split_Beh$Dives)
 ```
 
-Now that we see what the dive profile looks like, we can also look at some simple summary stats found by the dive.summary tool. We will allow for kmeans analysis to separate deep/long from shallow/short dives.
+Now that we see what the dive profile looks like, we can also look at some simple summary stats found by the dive.summary tool. We will allow for kmeans analysis to separate deep/long from shallow/short dives. The kmeans clustering in this function divides dives into only two clusters, which may not be good for all species. Hence we allow for a simple depth threshold to be used as well.
 
 ```{r}
 #collect summary data
@@ -113,7 +114,7 @@ SL_data <- sun.moon(DIVE_data)
 plot.sunmoon(SL_data, xlab = 'Deep Dive Number')
 ```
 
-We can also view bathymetry data in association with our tag data.
+Finally, we can view bathymetry data in association with our tag data. The `bathy.sync` function has two methods of gathering bathymetric data. One method (leaving the "bathy.folder" input NULL) will pull data from the internet. The other option is to provide a folder path to where a lot of csv files containing bathymetric data are kept. Here, we are simply going to use the online method.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #collect bathymetry data
@@ -122,3 +123,5 @@ BATHY_data <- bathy.sync(SL_data, z.radius = .25)
 #plot data
 plot.seafloor(BATHY_data, xlab = "Deep Dive Number")
 ```
+
+More tools to this package may be coming as time permits and ideas flow in. For now, please let me know if you run into any bugs or if you have any specific needs that this package does not accomplish for you.
