@@ -329,9 +329,34 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
       #pull ptolemy function to get land from input 'land.adjust'
       land_base <- suppressWarnings(land.adjust(...))
 
+      poly_expand <- 50000
+      res <- 1000
+      tmpland <- raster::rasterTmpFile()
+      r <- raster::raster(
+        ext = raster::extend(raster::extent(matrix(st_bbox(sf_pred_lines),
+                                                   2)),
+                             poly_expand),
+        resolution = res,
+        crs = sp::CRS(paste0("+init=epsg:",crs))
+      )
+      land <- raster::rasterize(land_base,
+                                r,
+                                getCover = TRUE,
+                                background = 0)
+      land <- land / 100
+      land[land < 1] <- 0
+      water <- raster::asFactor(1 - land)
+      trans <- gdistance::transition(water, "areas", directions = 16)
 
+      .fix_path <- function(prd, res_raster, trans) {
+        m <- crawl::fix_path(prd, res_raster, trans)
+        prd$mu.x <- m[,"mu.x"]
+        prd$mu.y <- m[,"mu.y"]
+        prd
+      }
 
-      warning('land adjustments not yet created, output does not include this process')
+      stop('land adjustments not yet created, output does not include this process')
+
     }
 
     #########################################################
