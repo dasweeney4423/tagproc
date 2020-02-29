@@ -6,7 +6,7 @@
 #' @param crs Desired coordinate reference system. Input should be an integer of a epsg code
 #' @param land.adjust A function from the ptolemy package specifying a region of land to be adjusted for by the modelling process. If given (e.g. calcur), the track will avoid all land provided by this input
 #' @param img.path File path and name where a simple prediction track will be returned as a pdf image. Do not include .pdf in the file name as this will be added automatically.
-#' @param ... Additional inputs to be passed in order to the function input for land.adjust. See the ptolemy package for possible inputs.
+#' @param ... Additional inputs to be passed to the function input for land.adjust. See the ptolemy package for possible inputs.
 #' @return A dataframe of of the predicted and original locations and times.
 #' @examples #examples not yet provided, sorry :(
 
@@ -328,6 +328,9 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
     if (!is.null(land.adjust)) { #https://github.com/dsjohnson/crawl_examples/blob/master/land_corrections/harborSeal_land_correction.R
       #pull ptolemy function to get land from input 'land.adjust'
       land_base <- suppressWarnings(land.adjust(...))
+
+
+
       warning('land adjustments not yet created, output does not include this process')
     }
 
