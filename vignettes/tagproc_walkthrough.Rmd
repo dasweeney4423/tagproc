@@ -22,6 +22,7 @@ The goal of this package is, as the title suggests, to help users of Wildlife Co
 In this tutorial, we will be using data from a Cuvier's beaked whale, tag ID ZcTag059, tagged off the coast of Southern California. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made.
 
 ```{r}
+#specify folder directory for WC data
 ZcTag059_folder <- "C:/Users/marec/Docs/ZcTag059-Portal-Folder"
 prettifyWC(ZcTag059_folder)
 ```
