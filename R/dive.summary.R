@@ -27,7 +27,7 @@ dive.summary <- function(dive, summfile = NULL, forage.cutoff = 600) {
     N.deeps <- length(deep)
     N.shallow <- length(shallow)
   } else {
-    if ((forage.cutoff == 'kmeans') & (('Kmeans' %in% names(dive) == FALSE) | (length(levels(dive$Kmeans)) > 2)) {
+    if ((forage.cutoff == 'kmeans') & (('Kmeans' %in% names(dive) == FALSE) | (length(levels(dive$Kmeans)) > 2))) {
       stop('Kmeans is not a column in dive data or there are too many groupings (2 maximum)')
     } else {
       deep <- which(dive$DepthAvg >= forage.cutoff & dive$Event == "Dive")
