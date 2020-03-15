@@ -19,8 +19,7 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
 
   ## Preparing Input Data for `crawl`
   #### Converting to spatial data
-  sf_locs <- st_as_sf(data, coords = c("Longitude", "Latitude")) %>%
-    st_set_crs("+init=epsg:4326")
+  sf_locs <- st_as_sf(data, coords = c("Longitude", "Latitude")) %>% st_set_crs("+init=epsg:4326")
 
   ### Error Parameters for GPS Data
   # set code to eliminate records with NA for error_radius. Does not eliminate any records for test tracks used.
@@ -45,12 +44,12 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
       dtime = x$Date,
       lc = x$LocationQuality,
       vmax = 7.5,
-      ang = -1
-    )
+      ang = -1)
   }
 
   data <- data %>%
-    dplyr::group_by(DeployID) %>% tidyr::nest() %>%
+    dplyr::group_by(DeployID) %>%
+    tidyr::nest() %>%
     dplyr::mutate(filtered = purrr::map(data, speed_filt)) %>%
     tidyr::unnest(cols = c(data, filtered)) %>%
     dplyr::filter(filtered %in% c("not", "end_location")) %>%
@@ -59,8 +58,7 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
 
   #########################################################
   ### Create a Spatial Object
-  sf_locs <- sf::st_as_sf(data, coords = c("Longitude", "Latitude")) %>%
-    sf::st_set_crs(., 4326)
+  sf_locs <- sf::st_as_sf(data, coords = c("Longitude", "Latitude")) %>% sf::st_set_crs(., 4326)
   sf_locs <- sf::st_transform(sf_locs, crs)
   sf::st_geometry(sf_locs)
 
@@ -85,7 +83,8 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
   ## Determining Your Model Parameters
   ### Create a Nested Data Structure
   sf_locs <- sf_locs %>%
-    dplyr::group_by(DeployID) %>% dplyr::arrange(Date) %>%
+    dplyr::group_by(DeployID) %>%
+    dplyr::arrange(Date) %>%
     tidyr::nest() %>%
     dplyr::mutate(data = purrr::map(data, sf::st_as_sf))
 
@@ -105,8 +104,7 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
                   diag = purrr::map(diag, ~ crawl::argosDiag2Cov(
                     .x[,1], .x[,2], .x[,3])),
                   data = purrr::map2(data, diag, dplyr::bind_cols)
-    ) %>%
-    dplyr::select(-diag)
+                  ) %>% dplyr::select(-diag)
 
   ### Create Model Parameters
   init_params <- function(d) {
@@ -130,12 +128,11 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
     dplyr::mutate(init = purrr::map(data, init_params),
                   fixpar = rep(
                     list(c(1, 1, NA, NA)),
-                    nrow(.)
-                  ),
+                    nrow(.)),
                   constr = rep(list(
                     list(lower = c(-Inf, -4), upper = (c(Inf, 4)))),
                     nrow(.))
-    )
+                  )
 
   #########################################################
   ## Fitting with `crawl::crwMLE()`
@@ -153,14 +150,12 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
   # Our wrapper function also checks the observed data, `d`, for any _activity_
   # column to determine whether activity parameter should be included in themodel fit.
 
-  fit_crawl <- function(d, init, fixpar, constr,
-                        tryBrownian = TRUE) {
+  fit_crawl <- function(d, init, fixpar, constr, tryBrownian = TRUE) {
 
-    priors <- list(
-      NULL,
-      ln_prior = function(par) { dnorm(par[2], 4, 4, log = TRUE) },
-      lap_prior = function(par) { -abs(par[2] - 4) / 5 },
-      reg_prior = function(par) { dt(par[2] - 3, df = 1, log = TRUE) }
+    priors <- list(NULL,
+      ln_prior = function(par) {dnorm(par[2], 4, 4, log = TRUE)},
+      lap_prior = function(par) {-abs(par[2] - 4) / 5},
+      reg_prior = function(par) {dt(par[2] - 3, df = 1, log = TRUE)}
     )
     #cycle through 4 different prior values. the first being no prior/NULL
     for (prior in priors) {
@@ -228,10 +223,10 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
   #This section relies on the `crawl::tidy_crwFit()` function which is only available with the latest `devel` version of `crawl` from GitHub.
 
   data_fit <- suppressWarnings(sf_locs %>%
-    dplyr::mutate(fit = purrr::pmap(list(d = data, init = init,
-                                         fixpar = fixpar, constr = constr),
-                                    fit_crawl),
-                  params = purrr::map(fit, crawl::tidy_crwFit)))
+                                 dplyr::mutate(fit = purrr::pmap(list(d = data, init = init,
+                                                                      fixpar = fixpar, constr = constr),
+                                                                 fit_crawl),
+                                               params = purrr::map(fit, crawl::tidy_crwFit)))
 
   # Explore the resulting parameter estimates. Note that for Ziphius, proximity of beta to 4
   # means it is essentially modeled as Brownian motion.
@@ -270,7 +265,7 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
       dplyr::mutate(TimeNum = lubridate::as_datetime(TimeNum),
                     DeployID = id) %>%
       dplyr::rename(pred_dt = TimeNum) %>%
-      #dplyr::filter(locType == loctype) %>%
+      dplyr::filter(locType == loctype) %>%
       sf::st_set_crs(.,epsg)
     if (type == "POINT") {return(p)}
     if (type == "LINE") {
@@ -307,6 +302,8 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
   # Transform these back to Lat Long
   m <- sf_pred_points %>%
     sf::st_transform(4326)
+  sf_pred_lines <- sf_pred_lines %>%
+    sf::st_transform(4326)
 
   xys <- as.character(m$geometry)
 
@@ -324,51 +321,23 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
 
   #########################################################
   ## Option:: Adjust Path Around Land
-  if (!is.null(land.adjust)) { #https://github.com/dsjohnson/crawl_examples/blob/master/land_corrections/harborSeal_land_correction.R
+  if (!is.null(land.adjust)) {
+    stop('land adjust does not yet work')
+    #https://github.com/dsjohnson/crawl_examples/blob/master/land_corrections/harborSeal_land_correction.R
     #pull ptolemy function to get land from input 'land.adjust'
     land_base <- suppressWarnings(land.adjust(...))
-
-    poly_expand <- 50000
-    res <- 1000
-    tmpland <- raster::rasterTmpFile()
-    r <- raster::raster(
-      ext = raster::extend(raster::extent(matrix(st_bbox(sf_pred_lines),
-                                                 2)),
-                           poly_expand),
-      resolution = res,
-      crs = sp::CRS(paste0("+init=epsg:",crs))
-    )
-    land <- raster::rasterize(land_base,
-                              r,
-                              getCover = TRUE,
-                              background = 0)
-    land <- land / 100
-    land[land < 1] <- 0
-    water <- raster::asFactor(1 - land)
-    trans <- gdistance::transition(water, "areas", directions = 16)
-
-    .fix_path <- function(prd, res_raster, trans) {
-      m <- crawl::fix_path(prd, res_raster, trans)
-      prd$mu.x <- m[,"mu.x"]
-      prd$mu.y <- m[,"mu.y"]
-      prd
-    }
-
-    stop('land adjustments not yet created, output does not include this process')
-
   }
 
   #########################################################
   # Format data to merge with tag-proc workflow
 
   mr <- data_fit$predict[[1]]
+  mr <- mr[which(mr$locType == 'p'),]
 
   mrDate <- mr$Date
-
   mrDeployID <- rep(data_fit$DeployID, times = nrow(mr))
-  mrPtt <- rep(data_fit$data[[1]]$Ptt[1], times = nrow(mr))
+  mrPtt <- mr$Ptt
   mrLoc <- mr$LocationQuality
-
   mrLatitude <- as.numeric(as.character(predicted.path$y))
   mrLongitude <- as.numeric(as.character(predicted.path$x))
 
@@ -377,5 +346,5 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
                    mr[,c(8:34)])
   names(mr)[which(names(mr) == "msg")] <- "MsgCount"
 
-  return(list(data = mr, points = m$geometry, lines = sf_pred_lines$.))
+  return(list(preds = mr, points = m$geometry, lines = sf_pred_lines$.))
 }
