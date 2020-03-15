@@ -17,9 +17,15 @@ knitr::opts_chunk$set(
 R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
 ```
 
+Greg, make sure to run this first line of code below to pull in these functions to your workspace. Make sure the file path is correct for where you put the .Rdata I gave you.
+
+```{r}
+#load("C:/Users/marec/Docs/tagproc_tools.RData")
+```
+
 The goal of this package is, as the title suggests, to help users of Wildlife Computers tag data get their data processed and ready for analysis. This package is designed to clean up your data, filter it, and allow for initial data exploration. This package is a constant work in progress as we hope to be able to include more tools as we get more ideas and receive feedback from you. So please, be thinking of ways to improve this package as you begin to read this tutorial and ultimately use the package.
 
-In this tutorial, we will be using data from a Cuvier's beaked whale, tag ID ZcTag059, tagged off the coast of Southern California. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made.
+In this tutorial, we will be using data from a Cuvier's beaked whale, tag ID ZcTag059, tagged off the coast of Southern California. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made. I am actually working on getting rid of this step and using the headers from the original WC portal data, but that will take some extra work that I have not committed to doing yet.
 
 ```{r}
 #specify folder directory for WC data
@@ -31,8 +37,10 @@ The new folder that is created is located within the tag data folder and is name
 
 We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter and Freitas filter on the argos data and a basic GPS filter (filtering locations by residual values and satellite numbers) on our GPS data.
 
+Note that if at any time you wish to save a dataframe into a csv file, simply use the following line of code: `write.csv(data, filepath, row.names = FALSE)`, where data is the data you wish to save and filepath is the folder directory and name for the file you are creating.
+
 ```{r}
-#pull in data
+#pull in data from prettified WC folder that was just made
 GPS_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/ZcTag058-164613-3-FastGPS.csv")
 Argos_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164613-Locations.csv")
 
@@ -47,13 +55,14 @@ GF_data <- gps.filter(GPS_data, max.te = 3 , max.residual = 35)$retained
 I will now create an estimated track from a continuous-time correlated random walk model. The estimated track can have locations predicted for different time intervals. Here I will be using a 30 minute interval. See the 'crawl' package for more options on possible time intervals.
 
 ```{r}
+#can also use '1 hour' for model.interval input
 CRAWL_data <- crawl.apply(DF_data, model.interval = '30 mins', crs = 2230)
 ```
 
 Now we can plot the CRAWL data to see how it looks. This plotting tool is the most basic location plotting tool in the package. Later on, we will use the `spatial.map` function to plot our data over ocean topography.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
-tag.mapper(CRAWL_data$data, zoom = 1, lon.offset = 0, lat.offset = 0,
+tag.mapper(CRAWL_data$preds, zoom = 1, lon.offset = 0, lat.offset = 0,
                        lwd = .5, pch = 1, cex = .5, col = "black", 
                        mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
@@ -61,7 +70,8 @@ tag.mapper(CRAWL_data$data, zoom = 1, lon.offset = 0, lat.offset = 0,
 As mentioned, we can also plot the animal track on a map after converting our data to a spatial object. Luckily, part of the `crawl.apply` function's output is contains the estimated animal locations as spatial objects, which we an directly input to the `spatial.map` tool. Additionally, we can calculate home range estimates and add them to the map. Before using the `spatial.map` function, however, you need to make sure you have internet connection as the topography data is pulled from the internet upon calling this function.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
-#find home ranges (95% and 50%)
+#find home ranges (95% and 50%), outputs into list elements that 
+#are indexed below in the plotting tool
 HR_data <- home.range(DF_data, perc = c(50, 95), kernel.method = 'href', unout = 'km2')
 
 #plot all data
@@ -87,6 +97,7 @@ We should also view the dive profile of this individual. However, before we do t
 Beh_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164613-Behavior.csv")
 
 #split behavior data
+#dive data will have kmeans clustering performed and borderline dives marked
 split_Beh <- split.dive.msg(Beh_data, kclusters = 2)
 
 #plot dives
@@ -105,7 +116,7 @@ Next, we can visualize the solar and lunar data associated with our tagged whale
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #associate CRAWL locations with diving behavior
 # and crop data to only dives that go below 800m depth
-DIVE_data <- bhvr.interpolate(split_Beh$Dives, CRAWL_data$data)
+DIVE_data <- bhvr.interpolate(split_Beh$Dives, CRAWL_data$preds)
 DIVE_data <- DIVE_data[which(DIVE_data$DepthAvg > 800),]
 
 #get solar and lunar data
