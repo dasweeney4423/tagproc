@@ -14,16 +14,15 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
-R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
-```
-
-Greg, make sure to run this first line of code below to pull in these functions to your workspace. Make sure the file path is correct for where you put the .Rdata I gave you.
-
-```{r}
-#load("C:/Users/marec/Docs/tagproc_tools.RData")
 ```
 
 The goal of this package is, as the title suggests, to help users of Wildlife Computers tag data get their data processed and ready for analysis. This package is designed to clean up your data, filter it, and allow for initial data exploration. This package is a constant work in progress as we hope to be able to include more tools as we get more ideas and receive feedback from you. So please, be thinking of ways to improve this package as you begin to read this tutorial and ultimately use the package.
+
+First, make sure to pull the functions in this package from the correct folder directory where you have stored them.
+
+```{r}
+R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
+```
 
 In this tutorial, we will be using data from a Cuvier's beaked whale, tag ID ZcTag059, tagged off the coast of Southern California. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made. I am actually working on getting rid of this step and using the headers from the original WC portal data, but that will take some extra work that I have not committed to doing yet.
 
@@ -35,7 +34,7 @@ prettifyWC(ZcTag059_folder)
 
 The new folder that is created is located within the tag data folder and is named WC-pretty. Opening up this new folder, you will see the same data files, but they will have been organized. 
 
-We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter and Freitas filter on the argos data and a basic GPS filter (filtering locations by residual values and satellite numbers) on our GPS data.
+We are next going to pull in the animal track for this animal and perform some filtering. We will run the Douglas-argos filter and Freitas filter on the argos data and a basic GPS filter (filtering locations by residual values and satellite numbers) on our GPS data. Note that if your what does not have GPS data, the gps.filter will obviously not work the following code chunk will give you an error.
 
 Note that if at any time you wish to save a dataframe into a csv file, simply use the following line of code: `write.csv(data, filepath, row.names = FALSE)`, where data is the data you wish to save and filepath is the folder directory and name for the file you are creating.
 
