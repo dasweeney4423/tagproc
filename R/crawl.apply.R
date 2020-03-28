@@ -342,7 +342,7 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
   mrLongitude <- as.numeric(as.character(predicted.path$x))
 
   mr <- data.frame(DeployID = mrDeployID, Ptt = mrPtt, Date = mrDate, LocationQuality = mrLoc,
-                   Latitude = mrLatitude, Longitude = mrLongitude, Instr = mr$Instr, Type= mr$Type,
+                   Latitude = mrLatitude, Longitude = mrLongitude, Type= mr$Type,
                    mr[,c(8:34)])
   names(mr)[which(names(mr) == "msg")] <- "MsgCount"
 
