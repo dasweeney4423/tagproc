@@ -74,25 +74,30 @@ split.dive.msg <- function(data, kclusters = NULL) {
       dive$Kmeans[diverow] <- kdata$kmeans[i]
     }
 
-    if (mean(dive$DepthAvg[which(dive$Kmeans == 1)], na.rm=T) > mean(dive$DepthAvg[which(dive$Kmeans == 2)], na.rm=T)) {
-      dive$Kmeans[which(dive$Kmeans != 1)] <- 'Shallow'
-      dive$Kmeans[which(dive$Kmeans == 1)] <- 'Deep'
+    if (kclusters == 2) {
+      if (mean(dive$DepthAvg[which(dive$Kmeans == 1)], na.rm=T) > mean(dive$DepthAvg[which(dive$Kmeans == 2)], na.rm=T)) {
+        dive$Kmeans[which(dive$Kmeans != 1)] <- 'Shallow'
+        dive$Kmeans[which(dive$Kmeans == 1)] <- 'Deep'
+      } else {
+        dive$Kmeans[which(dive$Kmeans != 1)] <- 'Deep'
+        dive$Kmeans[which(dive$Kmeans == 1)] <- 'Shallow'
+      }
+
+      #mark the borderline clusterings
+      deep <- dive[which(dive$Kmeans == 'Deep'),]
+      deep$Borderline <- FALSE
+      deep[which(scale(deep$DepthAvg) < quantile(scale(deep$DepthAvg), .05)),]$Borderline <- TRUE
+      deep[which(scale(deep$DurAvg) < quantile(scale(deep$DurAvg), .05)),]$Borderline <- TRUE
+      shallow <- dive[which(dive$Kmeans == 'Shallow'),]
+      shallow$Borderline <- FALSE
+      shallow[which(scale(shallow$DepthAvg) > quantile(scale(shallow$DepthAvg), .95)),]$Borderline <- TRUE
+      shallow[which(scale(shallow$DurAvg) > quantile(scale(shallow$DurAvg), .95)),]$Borderline <- TRUE
+      dive <- rbind(deep, shallow, surfacings)
+      dive <- dive[order(dive$Start),]
     } else {
-      dive$Kmeans[which(dive$Kmeans != 1)] <- 'Deep'
-      dive$Kmeans[which(dive$Kmeans == 1)] <- 'Shallow'
+      deep$Borderline <- deep <- shallow <- NA
     }
 
-    #mark the borderline clusterings
-    deep <- dive[which(dive$Kmeans == 'Deep'),]
-    deep$Borderline <- FALSE
-    deep[which(scale(deep$DepthAvg) < quantile(scale(deep$DepthAvg), .05)),]$Borderline <- TRUE
-    deep[which(scale(deep$DurAvg) < quantile(scale(deep$DurAvg), .05)),]$Borderline <- TRUE
-    shallow <- dive[which(dive$Kmeans == 'Shallow'),]
-    shallow$Borderline <- FALSE
-    shallow[which(scale(shallow$DepthAvg) > quantile(scale(shallow$DepthAvg), .95)),]$Borderline <- TRUE
-    shallow[which(scale(shallow$DurAvg) > quantile(scale(shallow$DurAvg), .95)),]$Borderline <- TRUE
-    dive <- rbind(deep, shallow, surfacings)
-    dive <- dive[order(dive$Start),]
   }
 
   # Format final output tables
