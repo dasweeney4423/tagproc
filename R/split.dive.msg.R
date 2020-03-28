@@ -95,7 +95,7 @@ split.dive.msg <- function(data, kclusters = NULL) {
       dive <- rbind(deep, shallow, surfacings)
       dive <- dive[order(dive$Start),]
     } else {
-      deep$Borderline <- deep <- shallow <- NA
+      dive$Borderline <- deep <- shallow <- NA
     }
 
   }
