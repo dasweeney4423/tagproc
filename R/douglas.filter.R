@@ -539,7 +539,6 @@ douglas.filter <- function(argos, argos_method, method, keep_lc = NULL, maxredun
               if ((distBC != 0) & (distAB != 0)) {
                 alpha <- int_ang(locA, locB, locC) #see above for code
                 minAlpha <- abs(-25 + ratecoef * log(min(distAB, distBC)))
-                subargos$anglediff[rB] <- alpha-minAlpha
                 if (alpha < minAlpha) {
                   subargos$outlier[rB] <- TRUE
                   skip <- TRUE
