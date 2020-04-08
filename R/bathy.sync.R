@@ -84,6 +84,8 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
       y <- LAT[i]
       if (length(z.radius) > 1) {
         z.rad <- z.radius[i]
+      } else {
+        z.rad <- z.radius
       }
 
       if (!is.na(x) & !is.na(y)) {
@@ -122,11 +124,6 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
 
     return(data)
   } else { #if online == TRUE
-    if (z.radius < 2.5) {
-      z.radius <- 2.5 # This dataset can't use anything more precise than this radius
-      warning("This NOAA dataset can't use anything more precise than a radius of 2.5")
-    }
-
     # Prep data
     LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
     LON <- data[, which(names(data) %in% c("Longitude", "StartLon"))]
@@ -138,6 +135,12 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
       yi <- as.numeric(as.character(LAT[i]))
       if (length(z.radius) > 1) {
         z.rad <- z.radius[i]
+      } else {
+        z.rad <- z.radius
+      }
+      if (z.rad < 2.5) {
+        z.rad <- 2.5 # This dataset can't use anything more precise than this radius
+        warning("This NOAA dataset can't use anything more precise than a radius of 2.5")
       }
 
       if (!is.na(xi) & !is.na(yi)) {
