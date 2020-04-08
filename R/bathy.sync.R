@@ -2,12 +2,17 @@
 #'
 #' Pulls bathymetry data from either the internet or a provided database and associates it with tag locations
 #' @param data A dataframe of location data to associate with bathymetry data
-#' @param z.radius Distance in km around each location that seafloor depth and slope will be calculated
+#' @param z.radius Distance in km around each location that seafloor depth and slope will be calculated. This can be a single value or a vector of different values the same length as the number of rows of the data input
 #' @param bathy.folder A directory path to the folder containing all bathymetry data. File names in the folder must be like this :'NEPACseafloor-116.000-30.000-115.000-31.000.csv'. If this input is NULL, data will be pulled from online, thus requiring internet access.
 #' @return A dataframe with all tag data and its associated bathymetry data as new columns in the dataset
 #' @examples #examples not yet provided, sorry :(
 
 bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
+  if (length(z.radius) > 1) {
+    if (length(z.radius) != nrow(data)) {
+      stop('length of z.radius must match number of rows in data or be a single, constant radius')
+    }
+  }
   if (!is.null(bathy.folder)) {
     # Prep data
     # Remove NA positions
@@ -77,13 +82,16 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
     for (i in 1:nrow(data)) {
       x <- LON[i]
       y <- LAT[i]
+      if (length(z.radius) > 1) {
+        z.rad <- z.radius[i]
+      }
 
       if (!is.na(x) & !is.na(y)) {
         # Seafloor depth
-        top <- swfscMisc::destination(lat = y, lon = x, brng = 0, distance = z.radius, units = "km", type = "vincenty")[1]
-        bottom <- swfscMisc::destination(lat = y, lon = x, brng = 180, distance = z.radius, units = "km", type = "vincenty")[1]
-        left <- swfscMisc::destination(lat = y, lon = x, brng = 270, distance = z.radius, units = "km", type = "vincenty")[2]
-        right <- swfscMisc::destination(lat = y, lon = x, brng = 90, distance = z.radius, units = "km", type = "vincenty")[2]
+        top <- swfscMisc::destination(lat = y, lon = x, brng = 0, distance = z.rad, units = "km", type = "vincenty")[1]
+        bottom <- swfscMisc::destination(lat = y, lon = x, brng = 180, distance = z.rad, units = "km", type = "vincenty")[1]
+        left <- swfscMisc::destination(lat = y, lon = x, brng = 270, distance = z.rad, units = "km", type = "vincenty")[2]
+        right <- swfscMisc::destination(lat = y, lon = x, brng = 90, distance = z.rad, units = "km", type = "vincenty")[2]
         zs <- zdf[zdf$x >= left & zdf$x <= right & zdf$y <= top & zdf$y >= bottom,]
         if (nrow(zs) > 0) {
           # Seafloor depth
@@ -94,7 +102,7 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
           zmini <- which.min(abs(zs$z))
           zmax <- abs(zs$z[zmaxi])
           zmin <- abs(zs$z[zmini])
-          zslop <- 100 * ((zmax - zmin) / (z.radius * 1000 * 2))
+          zslop <- 100 * ((zmax - zmin) / (z.rad * 1000 * 2))
           zslope[i] <- round(zslop,digits = 3)
 
           # Get aspect of slope
@@ -128,12 +136,15 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
     for (i in 1:nrow(data)) {
       xi <- as.numeric(as.character(LON[i]))
       yi <- as.numeric(as.character(LAT[i]))
+      if (length(z.radius) > 1) {
+        z.rad <- z.radius[i]
+      }
 
       if (!is.na(xi) & !is.na(yi)) {
-        top <- swfscMisc::destination(lat = yi, lon = xi, brng = 0, distance = z.radius, units = "km", type = "vincenty")[1]
-        bottom <- swfscMisc::destination(lat = yi, lon = xi, brng = 180, distance = z.radius, units = "km", type = "vincenty")[1]
-        left <- swfscMisc::destination(lat = yi, lon = xi, brng = 270, distance = z.radius, units = "km", type = "vincenty")[2]
-        right <- swfscMisc::destination(lat = yi, lon = xi, brng = 90, distance = z.radius, units = "km", type = "vincenty")[2]
+        top <- swfscMisc::destination(lat = yi, lon = xi, brng = 0, distance = z.rad, units = "km", type = "vincenty")[1]
+        bottom <- swfscMisc::destination(lat = yi, lon = xi, brng = 180, distance = z.rad, units = "km", type = "vincenty")[1]
+        left <- swfscMisc::destination(lat = yi, lon = xi, brng = 270, distance = z.rad, units = "km", type = "vincenty")[2]
+        right <- swfscMisc::destination(lat = yi, lon = xi, brng = 90, distance = z.rad, units = "km", type = "vincenty")[2]
         bath <- suppressMessages(marmap::getNOAA.bathy(lon1 = left, lon2 = right, lat1 = bottom, lat2 = top, resolution = 1, keep = FALSE, antimeridian = FALSE))
         bath <- marmap::as.xyz(bath)
         names(bath) <- c("x", "y", "z")
