@@ -24,12 +24,20 @@ First, make sure to pull the functions in this package from the correct folder d
 R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
 ```
 
-In this tutorial, we will be using data from a Cuvier's beaked whale, tag ID ZcTag059, tagged off the coast of Southern California. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made. I am actually working on getting rid of this step and using the headers from the original WC portal data, but that will take some extra work that I have not committed to doing yet.
+This is a constantly changing tutorial/walkthrough, so the data that is being used in it is constantly changing depending on the needs of the users. To begin, I am going to clean up the data a little bit and create a new folder within our Wildlife Computers tag data folder that has data with standardized column names as used by the tools in this package. This step is not necessary to use other tools in the package, however, it might make things easier as no manual column header changes would need to be made. I am actually working on getting rid of this step and using the headers from the original WC portal data, but that will take some extra work that I have not committed to doing yet.
 
 ```{r}
 #specify folder directory for WC data
-ZcTag059_folder <- "C:/Users/marec/Docs/ZcTag059-Portal-Folder"
-prettifyWC(ZcTag059_folder)
+tag_folder <- "G:/Shared drives/METR_TagData/Cuvier's beaked/Sat Tag- Raw/Zica-20190916-194277/Zica-20190916-194277"
+prettifyWC(tag_folder)
+
+#include reprocessed data into WCpretty folder if present
+#it is not present for this tag
+WCpretty_dir <- paste0(tag_folder,'/WC-pretty')
+prettify.reproc(filepath = "G:/Shared drives/METR_TagData/Cuvier's beaked/Sat Tag- Raw/Zica-20190512-172728/NWFSCHA-236-20191120181155/172728_2019-05-12_2019-06-22.kalman.csv", 
+                WCpretty_dir = WCpretty_dir, DeployID = 'Zica-20190512-172728',
+                dplat = 29.1447, dplong = -118.2813, dptime = "2019/5/12 14:34:19", 
+                dplc = 3, dperror = 100)
 ```
 
 The new folder that is created is located within the tag data folder and is named WC-pretty. Opening up this new folder, you will see the same data files, but they will have been organized. 
@@ -40,13 +48,13 @@ Note that if at any time you wish to save a dataframe into a csv file, simply us
 
 ```{r}
 #pull in data from prettified WC folder that was just made
-GPS_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/ZcTag058-164613-3-FastGPS.csv")
-Argos_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164613-Locations.csv")
+GPS_data <- read.csv(paste0(WCpretty_dir,"/ZcTag058-164613-3-FastGPS.csv"))
+Argos_data <- read.csv(paste0(WCpretty_dir,"/194277-Locations.csv"))
 
 #run filters
 DF_data <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', 
                           keep_lc = 1, maxredun = 3, duplrec = 'offset', 
-                          minrate = 15, ratecoef = 20, r_only = FALSE)$retained
+                          minrate = 10, ratecoef = 25, r_only = FALSE)$retained
 FF_data <- freitas.filter(Argos_data, vmax = 2, ang = c(15, 25), distlim = c(2.5, 5))$retained
 GF_data <- gps.filter(GPS_data, max.te = 3 , max.residual = 35)$retained
 ```
@@ -55,13 +63,19 @@ I will now create an estimated track from a continuous-time correlated random wa
 
 ```{r}
 #can also use '1 hour' for model.interval input
-CRAWL_data <- crawl.apply(DF_data, model.interval = '30 mins', crs = 2230)
+CRAWL_data <- crawl.apply(DF_data, model.interval = '2 hours', crs = 2230)
+
+#add original data to crawl predictions
+cpreds <- CRAWL_data$preds[,c("DeployID","Ptt","Date","LocationQuality","Latitude","Longitude","Type","Satellite","Error.radius","Error.Semi.major.axis","Error.Semi.minor.axis","Error.Ellipse.orientation")]
+df_data <- DF_data[,c("DeployID","Ptt","Date","LocationQuality","Latitude","Longitude","Type","Satellite","Error.radius","Error.Semi.major.axis","Error.Semi.minor.axis","Error.Ellipse.orientation")]
+locations <- rbind(cpreds,df_data)
+locations <- locations[order(locations$Date),]
 ```
 
 Now we can plot the CRAWL data to see how it looks. This plotting tool is the most basic location plotting tool in the package. Later on, we will use the `spatial.map` function to plot our data over ocean topography.
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
-tag.mapper(CRAWL_data$preds, zoom = 1, lon.offset = 0, lat.offset = 0,
+tag.mapper(locations, zoom = 1, lon.offset = 0, lat.offset = 0,
                        lwd = .5, pch = 1, cex = .5, col = "black", 
                        mars = c(1, 1, 1, 1), mapfile = NULL)
 ```
@@ -83,7 +97,7 @@ We can also use the `polyprox` and `plot.polygons` functions to plot animal trac
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #get polygon proximity data
-POLY_data <- polyprox(DF_data, polypath = "C:/Users/marec/Docs/TagProcApp-20180519/20180519/Resources-Polygons")
+POLY_data <- polyprox(locations, polypath = "C:/Users/marec/Docs/TagProcApp-20180519/20180519/Resources-Polygons")
 
 #plot polygon data
 plot.polygons(POLY_data, polypath = "C:/Users/marec/Docs/TagProcApp-20180519/20180519/Resources-Polygons")
@@ -93,11 +107,13 @@ We should also view the dive profile of this individual. However, before we do t
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #pull in data
-Beh_data <- read.csv("C:/Users/marec/Docs/ZcTag059-Portal-Folder/WC-pretty/164613-Behavior.csv")
+Beh_data <- read.csv(paste0(WCpretty_dir,"/194277-Behavior.csv"))
 
 #split behavior data
 #dive data will have kmeans clustering performed and borderline dives marked
-split_Beh <- split.dive.msg(Beh_data, kclusters = 2)
+split_Beh2 <- split.dive.msg(Beh_data, kclusters = 2)
+split_Beh3 <- split.dive.msg(Beh_data, kclusters = 3)
+split_Beh <- split_Beh2
 
 #plot dives
 diveplot(split_Beh$Dives)
@@ -114,9 +130,7 @@ Next, we can visualize the solar and lunar data associated with our tagged whale
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #associate CRAWL locations with diving behavior
-# and crop data to only dives that go below 800m depth
-DIVE_data <- bhvr.interpolate(split_Beh$Dives, CRAWL_data$preds)
-DIVE_data <- DIVE_data[which(DIVE_data$DepthAvg > 800),]
+DIVE_data <- bhvr.interpolate(split_Beh$Dives, locations)
 
 #get solar and lunar data
 SL_data <- sun.moon(DIVE_data)
@@ -129,10 +143,20 @@ Finally, we can view bathymetry data in association with our tag data. The `bath
 
 ```{r, fig.height=4, fig.width=7, fig.align='center'}
 #collect bathymetry data
-BATHY_data <- bathy.sync(SL_data, z.radius = .25)
+BATHY_data <- bathy.sync(SL_data)
 
 #plot data
 plot.seafloor(BATHY_data, xlab = "Deep Dive Number")
 ```
 
 More tools to this package may be coming as time permits and ideas flow in. For now, please let me know if you run into any bugs or if you have any specific needs that this package does not accomplish for you.
+
+```{r}
+View(locations)
+View(BATHY_data)
+```
+
+```{r}
+write.csv(locations, paste0(WCpretty_dir,'/DF_CRAWL_Locations.csv'), row.names = F)
+write.csv(BATHY_data, paste0(WCpretty_dir,'/Locations_Behavior_Environment.csv'), row.names=F)
+```
