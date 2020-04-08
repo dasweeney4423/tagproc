@@ -114,7 +114,10 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
 
     return(data)
   } else { #if online == TRUE
-    if (z.radius < 2.5) {z.radius <- 2.5} # This dataset can't use anything more precise than this radius
+    if (z.radius < 2.5) {
+      z.radius <- 2.5 # This dataset can't use anything more precise than this radius
+      warning("This NOAA dataset can't use anything more precise than a radius of 2.5")
+    }
 
     # Prep data
     LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
