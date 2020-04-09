@@ -127,6 +127,7 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
     # Prep data
     LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
     LON <- data[, which(names(data) %in% c("Longitude", "StartLon"))]
+    warning("This NOAA dataset can't use anything more precise than a radius of 2.5. If input is less than 2.5, it will be set to 2.5.")
 
     # Get depth and slope for each point
     n <- zmin <- zmax <- z <- zslope <- zaspect <- rep(NA, times = nrow(data))
@@ -140,7 +141,6 @@ bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
       }
       if (z.rad < 2.5) {
         z.rad <- 2.5 # This dataset can't use anything more precise than this radius
-        warning("This NOAA dataset can't use anything more precise than a radius of 2.5")
       }
 
       if (!is.na(xi) & !is.na(yi)) {
