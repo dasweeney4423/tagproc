@@ -23,8 +23,13 @@ crawl.apply <- function(data, model.interval = '1 hour', crs = 2230, land.adjust
 
   ### Error Parameters for GPS Data
   # set code to eliminate records with NA for error_radius. Does not eliminate any records for test tracks used.
+  user <- data[which(data$Type == 'User'),]
+  data <- data[which(data$Type != 'User'),]
   data <- data %>%
     dplyr::filter(!(is.na(Error.radius)))
+  if (nrow(user) > 0) {
+    data <- rbind(user, data)
+  }
 
   ### Duplicate Times
   make_unique <- function(x) {
