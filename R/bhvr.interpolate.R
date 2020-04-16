@@ -6,16 +6,21 @@
 #' @return A dataframe similar to the input for "data", but extra columns will be attached containing associated location and movement data for the animal.
 #' @examples #examples not yet provided, sorry :(
 
-bhvr.interpolate <- function(data, locs) {
+bhvr.interpolate <- function(data, locs, matching = FALSE) {
   # Format bhvr logs
   data$StartTime <- time.turner(data$StartTime)$strp
   data$EndTime <- time.turner(data$EndTime)$strp
+
+  if (matching) {
+    locs$Date <- time.turner(locs$Date)$strp
+    mr <- cbind(data, locs)
+    return(mr)
+  }
 
   # Format locs positions
   if (names(locs)[1] == "row.names") {names(locs) <- c(names(locs)[2:ncol(locs)], "XNA")}
   if ("Satellite" %in% names(locs)) {locs <- locs[!locs$Satellite %in% c("13X0002", "14X0011"),]}
   locs$Date <- time.turner(locs$Date)$strp
-  if (!"locType" %in% names(locs)) {locs$locType <- "o"} else {locs$locType <- as.character(locs$locType)}
   if (!"LocationQuality" %in% names(locs)) {locs$LocationQuality <- NA}
 
   # Write function:
@@ -29,7 +34,6 @@ bhvr.interpolate <- function(data, locs) {
     posts <- which(diffs > 0) # Store all ARGOS times after time1 (positive)
 
     lat <- lon <- NA
-    NearestObs.Min <-NearestObs.LQ <- NA
     LastPos.Mins <- NextPos.Mins <- NA
     LastPos.Type <- NextPos.Type <- NA
     LastPos.Msg <- NextPos.Msg <- NA
@@ -42,12 +46,8 @@ bhvr.interpolate <- function(data, locs) {
       post <- posts[1]  # Store earliest post index
 
       # Store details of nearest Argos fixes
-      locs[prior,]
-
       LastPos.Mins <- abs(round(as.numeric(diffs[prior]), digits = 2))
       NextPos.Mins <- round(as.numeric(diffs[post]), digits = 2)
-      LastPos.Type <- as.character(locs$locType[prior])
-      NextPos.Type <- as.character(locs$locType[post])
       LastPos.Msg <- locs$MsgCount[prior]
       NextPos.Msg <- locs$MsgCount[post]
       if ("Satellite" %in% names(locs)){
@@ -81,29 +81,11 @@ bhvr.interpolate <- function(data, locs) {
           NextPos.Km <- swfscMisc::distance(lat1 = postloc[2], lon1 = postloc[1], lat2 = lat, lon2 = lon, units = "km", method = "vincenty")
         }
       }
-
-      # Repeat for OBSERVED locations (observed and predicted)
-      obs <- locs[locs$locType == "o",]
-      diffs <- difftime(obs$Date, time1, units = "mins") # Subtract all ARGOS times from time1
-      priors <- which(diffs < 0) # Store all ARGOS times prior to time1 (negative)
-      posts <- which(diffs > 0) # Store all ARGOS times after time1 (positive)
-      if (length(priors) > 0 & length(posts) > 0) {
-        prior <- priors[length(priors)] # Store most recent prior index
-        post <- posts[1]  # Store earliest post index
-        LastObs.Mins <- abs(round(as.numeric(diffs[prior]), digits = 2))
-        NextObs.Mins <- round(as.numeric(diffs[post]), digits = 2)
-        NearestObs.Min <- min(c(LastObs.Mins, NextObs.Mins), na.rm = TRUE)
-        if (NearestObs.Min == NextObs.Mins) {
-          NearestObs.LQ <- obs$LocationQuality[prior]
-        } else {
-          NearestObs.LQ <- obs$LocationQuality[post]
-        }
-      }
     }
 
-    return(data.frame(Lat = lat, Lon = lon, NearestObs.Min, NearestObs.LQ,
-                      LastPos.Mins, LastPos.Km, LastPos.Type, LastPos.Msg, LastPos.Satellite, LastPos.LocationQuality,
-                      NextPos.Mins, NextPos.Km, NextPos.Type, NextPos.Msg, NextPos.Satellite, NextPos.LocationQuality))
+    return(data.frame(Lat = lat, Lon = lon,
+                      LastPos.Mins, LastPos.Km, LastPos.Msg, LastPos.Satellite, LastPos.LocationQuality,
+                      NextPos.Mins, NextPos.Km, NextPos.Msg, NextPos.Satellite, NextPos.LocationQuality))
   }
 
   # Use ARGOS records to interpolate location of behavioral records
