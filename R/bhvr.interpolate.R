@@ -18,6 +18,8 @@ bhvr.interpolate <- function(data, locs, matching = FALSE) {
     }
     locs$Date <- time.turner(locs$Date)$strp
     mr <- cbind(data, locs)
+    ddate <- which(names(mr) == "Date")
+    mr <- mr[,-ddate]
     return(mr)
   }
 
