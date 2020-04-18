@@ -9,11 +9,12 @@
 #' @param surface (optional) The threshold in meters at which the animal is presumed to have reached the surface. Default value is 1. A smaller value can be used if the dive/altitude data are very accurate and you need to detect shallow dives/flights.
 #' @param findall (optional) When 1 forces the algorithm to include incomplete dives at the start and end of the record. Default is 0 which only recognizes complete dives.
 #' @param kclusters The number of clusters desired to create for k-means clustering of dive depth and dive duration for the output of the Dives data. If left blank, no cluster will be performed.
+#' @param lag The number of minutes for which sequence lags longer than it are considered data skips. Used when marking surfacings. Default is 15 minutes.
 #' @return A data frame with one row for each dive found. The data will have identical olumn names as can be found in a Ptt-Behavior.csv file from the WC portal.
 #' @note This function utilizes the find_dives function in the tagtools package (https://github.com/stacyderuiter/TagTools).
 #' @export
 
-simplify.archival <- function(data, mindepth, mindur, divestart = NULL, surface = 1, findall = 0, kclusters = 2) {
+simplify.archival <- function(data, mindepth, mindur, divestart = NULL, surface = 1, findall = 0, kclusters = 2, lag = 15) {
   #find dives code from tagtools package
   find_dives <- function(p, mindepth, sampling_rate = NULL, surface = 1, findall = 0) {
     if (nargs() < 2) {
@@ -252,5 +253,10 @@ simplify.archival <- function(data, mindepth, mindur, divestart = NULL, surface 
                        Shape, DepthMin, DepthMax, DepthAvg,
                        DurationMin, DurationMax, DurAvg, Shallow,
                        Deep, Kmeans, Borderline)
+
+  if (kclusters == 2) {
+    output <- mark.surfacings(output, lag)
+  }
+
   return(output)
 }
