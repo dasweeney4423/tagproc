@@ -3,6 +3,7 @@
 #' This functions takes data input from the Behavior.csv file from the WC portal and divides it into two dataframes, one for dive data and the other for data messages
 #' @param data A dataframe containing the Behavior.csv data from the WC portal
 #' @param kclusters The number of clusters desired to create for k-means clustering of dive depth and dive duration for the output of the Dives data. If left blank, no cluster will be performed.
+#' @param lag The number of minutes for which sequence lags longer than it are considered data skips. Used when marking surfacings. Default is 15 minutes.
 #' @return A list of two elements:
 #' \itemize{
 #' \item{\strong{Dives: }} A dataframe containing all surfacing or dive rows from the Behavior.csv data after having been processed
@@ -10,7 +11,7 @@
 #' }
 #' @examples #examples not yet provided, sorry :(
 
-split.dive.msg <- function(data, kclusters = NULL) {
+split.dive.msg <- function(data, kclusters = NULL, lag = 15) {
   # Format times (make sure seconds are kept)
   data$Start <- as.POSIXct(time.turner(as.character(data$Start))$strp)  # Start time
   data$End <- as.POSIXct(time.turner(as.character(data$End))$strp) # End time
@@ -97,7 +98,6 @@ split.dive.msg <- function(data, kclusters = NULL) {
     } else {
       dive$Borderline <- deep <- shallow <- NA
     }
-
   }
 
   # Format final output tables
@@ -137,9 +137,9 @@ split.dive.msg <- function(data, kclusters = NULL) {
                       Kmeans = dive$Kmeans,
                       Borderline = dive$Borderline)
 
-  # if (kclusters == 2) {
-  #   Dives <- mark.surfacings(Dives)
-  # }
+  if (kclusters == 2) {
+    Dives <- mark.surfacings(Dives, lag)
+  }
 
   return(list(Dives = Dives, Messages = Messages))
 }
