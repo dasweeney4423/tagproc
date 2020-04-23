@@ -9,13 +9,43 @@
 #' @param kclusters The number of clusters desired to create for k-means clustering of dive depth and dive duration for the output of the Dives data. If left blank, no cluster will be performed.
 #' @param lag The number of minutes for which sequence lags longer than it are considered data skips. Used when marking surfacings. Default is 15 minutes.
 #' @return A data frame with one row for each dive found. The data will have identical olumn names as can be found in a Ptt-Behavior.csv file from the WC portal.
-#' @note This function utilizes the find_dives and fir_nodelay functions in the tagtools package (https://github.com/stacyderuiter/TagTools).
+#' @note This function utilizes the find_dives, load_nc, and fir_nodelay functions in the tagtools package (https://github.com/stacyderuiter/TagTools).
 #' @export
 
 simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 100, kclusters = NULL, lag = 15) {
-  if (!is.list(tag)) {
-    stop('input for tag should be a list with, at minimum, depth and wet/dry sensor data structures')
+  #load nc file
+  load_nc <- function(file, which_vars=NULL){
+    if (!grepl('.nc', file)){
+      file <- paste(file, '.nc', sep='')
+    }
+    file_conn <- ncdf4::nc_open(file)
+    #get variable names present in this file
+    vars <- names(file_conn$var)
+    if (!is.null(which_vars)){
+      vars <- vars[vars %in% which_vars]
+    }
+    #read in the variables one by one and store in a list
+    X <- list()
+    for (v in 1:length(vars)){
+      #get metadata for variable v
+      X[[v]] <- ncdf4::ncatt_get(file_conn, vars[v])
+      # remove redundant name label
+      X[[v]]$name <- NULL
+      field_names <- names(X[[v]])
+      # add the actual data matrix or vector
+      X[[v]]$data <- ncdf4::ncvar_get(file_conn, vars[v])
+      # make sure the sensor data is the first element of X[[v]]
+      X[[v]] <- X[[v]][c('data', field_names)]
+    }
+    # entries of X should match variable names from netCDF file
+    names(X) <- vars
+    # get metadata and add it to X as "info"
+    X$info <- ncdf4::ncatt_get( file_conn , 0 )
+    ncdf4::nc_close(file_conn)
+    class(X) <- c('animaltag', 'list')
+    return(X)
   }
+  tag <- load_nc(tag)
 
   #either use wet/dry if NULL or a depth value if given
   if (is.null(divestart)) {
