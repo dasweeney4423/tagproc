@@ -82,7 +82,7 @@ mark.surfacings <- function(data, lag = 15) { #first, internal, terminal, unknow
         }
         if (i < deeps[1]) {
           firstrows <- whale[which(whale$Event == 'Surface' & whale$RecordNo < deeps[1]),]
-          if (nrow(firstrows) > 3) {
+          if (nrow(firstrows) >= 3) {
             if (first == FALSE) {
               whale$SurfaceType[i] <- 'ISS'
             } else {
