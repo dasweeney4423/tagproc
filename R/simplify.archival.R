@@ -1,7 +1,7 @@
 #' Find time cues for dives
 #'
 #' This function is used to find the time cues for the start and end of dives in a depth record and turn them into data with similar formatting to Wildlife Computers behavior log files.
-#' @param tag A .nc file containing all datastreams from an archival tag
+#' @param tag A .nc file containing all datastreams from an archival tag or a tag data structure from load_nc()
 #' @param mindepth The threshold in meters at which to recognize a dive or flight. Dives shallower than mindepth will be ignored.
 #' @param mindur The threshold in seconds at which to recognize a dive. Dives that are not blow mindepth for at least mindur will be ignored.
 #' @param divestart The threshold in meters at which a submergence might be considered a dive. If NULL, then wet/dry data is used for this threshold and the input for wetdry is required.
@@ -13,39 +13,45 @@
 #' @export
 
 simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 100, kclusters = NULL, lag = 15) {
-  #load nc file
-  load_nc <- function(file, which_vars=NULL){
-    if (!grepl('.nc', file)){
-      file <- paste(file, '.nc', sep='')
+  if (is.character(tag)) {
+    #load nc file
+    load_nc <- function(file, which_vars=NULL){
+      if (!grepl('.nc', file)){
+        file <- paste(file, '.nc', sep='')
+      }
+      file_conn <- ncdf4::nc_open(file)
+      #get variable names present in this file
+      vars <- names(file_conn$var)
+      if (!is.null(which_vars)){
+        vars <- vars[vars %in% which_vars]
+      }
+      #read in the variables one by one and store in a list
+      X <- list()
+      for (v in 1:length(vars)){
+        #get metadata for variable v
+        X[[v]] <- ncdf4::ncatt_get(file_conn, vars[v])
+        # remove redundant name label
+        X[[v]]$name <- NULL
+        field_names <- names(X[[v]])
+        # add the actual data matrix or vector
+        X[[v]]$data <- ncdf4::ncvar_get(file_conn, vars[v])
+        # make sure the sensor data is the first element of X[[v]]
+        X[[v]] <- X[[v]][c('data', field_names)]
+      }
+      # entries of X should match variable names from netCDF file
+      names(X) <- vars
+      # get metadata and add it to X as "info"
+      X$info <- ncdf4::ncatt_get( file_conn , 0 )
+      ncdf4::nc_close(file_conn)
+      class(X) <- c('animaltag', 'list')
+      return(X)
     }
-    file_conn <- ncdf4::nc_open(file)
-    #get variable names present in this file
-    vars <- names(file_conn$var)
-    if (!is.null(which_vars)){
-      vars <- vars[vars %in% which_vars]
+    tag <- load_nc(tag)
+  } else {
+    if (!is.list(tag)) {
+      stop('tag should either be a tag data structure from load_nc or the file path as an input')
     }
-    #read in the variables one by one and store in a list
-    X <- list()
-    for (v in 1:length(vars)){
-      #get metadata for variable v
-      X[[v]] <- ncdf4::ncatt_get(file_conn, vars[v])
-      # remove redundant name label
-      X[[v]]$name <- NULL
-      field_names <- names(X[[v]])
-      # add the actual data matrix or vector
-      X[[v]]$data <- ncdf4::ncvar_get(file_conn, vars[v])
-      # make sure the sensor data is the first element of X[[v]]
-      X[[v]] <- X[[v]][c('data', field_names)]
-    }
-    # entries of X should match variable names from netCDF file
-    names(X) <- vars
-    # get metadata and add it to X as "info"
-    X$info <- ncdf4::ncatt_get( file_conn , 0 )
-    ncdf4::nc_close(file_conn)
-    class(X) <- c('animaltag', 'list')
-    return(X)
   }
-  tag <- load_nc(tag)
 
   #either use wet/dry if NULL or a depth value if given
   if (is.null(divestart)) {
