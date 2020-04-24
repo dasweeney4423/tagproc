@@ -7,7 +7,7 @@
 #' @return A dataframe with all tag data and its associated bathymetry data as new columns in the dataset
 #' @examples #examples not yet provided, sorry :(
 
-bathy.sync <- function(data, z.radius = .25, bathy.folder = NULL) {
+bathy.sync <- function(data, z.radius = 2.5, bathy.folder = NULL) {
   if (length(z.radius) > 1) {
     if (length(z.radius) != nrow(data)) {
       stop('length of z.radius must match number of rows in data or be a single, constant radius')
