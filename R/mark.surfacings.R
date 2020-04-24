@@ -41,6 +41,10 @@ mark.surfacings <- function(data, lag = 15) { #first, internal, terminal, unknow
     for (i in 1:nrow(whale)) {
       if (i %in% terminals == FALSE) {next}
       if (!is.na(whale$SurfaceType[i])) {next}
+      if (is.na(whale$SeqLag[i])) {
+        whale$SurfaceType[i] <- 'USS'
+        next
+      }
       if (abs(whale$SeqLag[i]) > lag) {
         whale$SurfaceType[i] <- 'USS'
         next
