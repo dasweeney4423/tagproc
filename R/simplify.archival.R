@@ -7,12 +7,11 @@
 #' @param divestart The threshold in meters at which a submergence might be considered a dive. If NULL, then wet/dry data is used for this threshold and the input for wetdry is required.
 #' @param wetdry The wet/dry sensor threshold for determining when the tag is going dry or going wet. Default is 100.
 #' @param kclusters The number of clusters desired to create for k-means clustering of dive depth and dive duration for the output of the Dives data. If left blank, no cluster will be performed.
-#' @param lag The number of minutes for which sequence lags longer than it are considered data skips. Used when marking surfacings. Default is 15 minutes.
 #' @return A data frame with one row for each dive found. The data will have identical olumn names as can be found in a Ptt-Behavior.csv file from the WC portal.
 #' @note This function utilizes the find_dives, load_nc, and fir_nodelay functions in the tagtools package (https://github.com/stacyderuiter/TagTools).
 #' @export
 
-simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 100, kclusters = NULL, lag = 15) {
+simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 100, kclusters = NULL) {
   if (is.character(tag)) {
     #load nc file
     load_nc <- function(file, which_vars=NULL){
@@ -260,7 +259,7 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
                          Deep, Kmeans, Borderline)
 
     if (kclusters == 2) {
-      output <- mark.surfacings(output, lag)
+      output <- mark.surfacings(output)
     }
 
   } else {
