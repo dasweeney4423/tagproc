@@ -71,9 +71,24 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
     }
 
     #find cues (seconds) of becoming wet/dry and associate to find submergence cues
+    if (length(unique(wet)) == 2) {
+      wetdry <- 0.5
+    }
     tdry <- which(c(0, diff(wet > wetdry)) > 0) / wfs
+    delete <- c()
+    for (i in 1:length(tdry)) {
+      if (p[(pfs*tdry[i])] > 3) {
+        delete <- c(delete, i)
+      }
+    }
+    if (length(delete) > 0) {
+      tdry <- tdry[-delete]
+    }
     twet <- which(c(0, diff(wet > wetdry)) < 0) / wfs
-    dryafter <- tdry[which(tdry > twet[1])]
+    dryafter <- c()
+    for (i in 1:length(twet)) {
+      dryafter <- c(dryafter, tdry[which(tdry > twet[i])[1]])
+    }
     ml <- min(c(length(dryafter), length(tdry)))
     subs <- data.frame(start = twet[1:ml], end = dryafter[1:ml])
 
@@ -136,8 +151,15 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
       #mark the borderline clusterings
       deep <- dives[which(dives$Kmeans == 'Deep'),]
       deep$Borderline <- FALSE
-      deep[which(scale(deep$max) < quantile(scale(deep$max), .05)),]$Borderline <- TRUE
-      deep[which(scale(deep$dur) < quantile(scale(deep$dur), .05)),]$Borderline <- TRUE
+      wd <- which(scale(deep$max) < quantile(scale(deep$max), .05))
+      if (length(wd) > 0) {
+        deep[wd,]$Borderline <- TRUE
+      }
+      wd <- which(scale(deep$dur) < quantile(scale(deep$dur), .05))
+      if (length(wd) > 0) {
+        deep[wd,]$Borderline <- TRUE
+      }
+      deep[wd,]$Borderline <- TRUE
       shallow <- dives[which(dives$Kmeans == 'Shallow'),]
       shallow$Borderline <- FALSE
       shallow[which(scale(shallow$max) > quantile(scale(shallow$max), .95)),]$Borderline <- TRUE
@@ -230,38 +252,6 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
       row <- data.frame(start, end, dur, max, shape, type, Borderline, Kmeans, Deep, Shallow)
       beh <- rbind(beh, row)
     }
-
-    #create return data
-    TagID <- tag$info$depid
-    if (length(strsplit(TagID, '-')[[1]]) == 3) {
-      PTT <- strsplit(TagID, '-')[[1]][3]
-    } else {
-      PtT <- NA
-    }
-    MsgCount <- NA
-    SeqLag <- 0
-    RecordNo <- c(1:nrow(beh))
-    StartTime <- beh$start + as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
-    EndTime <- beh$end + as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
-    Event <- beh$type
-    Shape <- beh$shape
-    DepthMin <- DepthMax <- DepthAvg <- beh$max
-    DurationMin <- DurationMax <- beh$dur
-    DurAvg <- beh$dur / 60
-    Shallow <- beh$Shallow
-    Deep <- beh$Deep
-    Kmeans <- beh$Kmeans
-    Borderline <- beh$Borderline
-    output <- data.frame(TagID, PTT, RecordNo, MsgCount,
-                         StartTime, EndTime, SeqLag, Event,
-                         Shape, DepthMin, DepthMax, DepthAvg,
-                         DurationMin, DurationMax, DurAvg, Shallow,
-                         Deep, Kmeans, Borderline)
-
-    if (kclusters == 2) {
-      output <- mark.surfacings(output)
-    }
-
   } else {
 
     ###############################################################################
@@ -400,7 +390,10 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
     }
 
     #get dive times
-    fdout <- find_dives(p, mindepth, sampling_rate = pfs, surface = divestart, findall = 0)
+    fdout <- suppressWarnings(find_dives(p, mindepth, sampling_rate = pfs, surface = divestart, findall = 0))
+    if (p[(fdout$end[nrow(fdout)]*pfs)] > divestart) {
+      fdout <- fdout[-nrow(fdout),]
+    }
     fdout$dur <- fdout$end - fdout$start
 
     #filter out dives that aren't greater than mindepth for at least mindur
@@ -412,7 +405,11 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
         delete <- c(delete, i)
       }
     }
-    dives <- fdout[-delete,]
+    if (!is.null(delete)) {
+      dives <- fdout[-delete,]
+    } else {
+      dives <- fdout
+    }
 
     #determine dive shapes and convert to times
     dives$shape <- NA
@@ -489,14 +486,19 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
     }
 
     #combine dives and surfacings
+    dives <- dives[,names(surfacings)]
     beh <- rbind(dives, surfacings)
     beh <- beh[order(beh$start),]
+
+    #find dives with incomplete dives
+    dall <- suppressWarnings(find_dives(p, mindepth, sampling_rate = pfs, surface = divestart, findall = 1))
 
     #if surfacing happened before first dive, add it to data
     pbefore <- p[1:(pfs*beh$start[1])]
     pbeforedeepdur <- length(which(pbefore >= mindepth)) / pfs
-    if ((tdry[1] < beh$start[1]) & (pbeforedeepdur >= mindur)) {
-      start <- tdry[1]
+    pminbefore <- which(pbefore < divestart)[1]
+    if ((pminbefore < (pfs*beh$start[1])) & (pbeforedeepdur >= mindur)) {
+      start <- dall$end[1]
       end <- beh$start[1]
       dur <- end - start
       max <- NA
@@ -521,10 +523,10 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
     #if surfacing happened after last dive, add it to data
     pafter <- p[(pfs*beh$end[nrow(beh)]):length(p)]
     pafterdeepdur <- length(which(pafter >= mindepth)) / pfs
-    tpwet <- twet[which(twet < (length(p) / pfs))]
-    if ((tpwet[length(tpwet)] > beh$end[nrow(beh)]) & (pafterdeepdur >= mindur)) {
+    pminafter <- which(pafter < divestart)[length(which(pafter < divestart))] + length(p[1:(pfs*beh$end[nrow(beh)])])
+    if ((pminafter > (pfs*beh$end[nrow(beh)])) & (pafterdeepdur >= mindur)) {
       start <- beh$end[nrow(beh)]
-      end <- tpwet[length(tpwet)]
+      end <- dall$end[nrow(dall)]
       dur <- end - start
       max <- NA
       type <- 'Surface'
@@ -544,37 +546,40 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 
       row <- data.frame(start, end, dur, max, shape, type, Borderline, Kmeans, Deep, Shallow)
       beh <- rbind(beh, row)
     }
+  }
 
-    #create return data
-    TagID <- tag$info$depid
-    if (length(strsplit(TagID, '-')[[1]]) == 3) {
-      PTT <- strsplit(TagID, '-')[[1]][3]
-    } else {
-      PtT <- NA
-    }
-    MsgCount <- NA
-    SeqLag <- 0
-    RecordNo <- c(1:nrow(beh))
-    StartTime <- beh$start + as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
-    EndTime <- beh$end + as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
-    Event <- beh$type
-    Shape <- beh$shape
-    DepthMin <- DepthMax <- DepthAvg <- beh$max
-    DurationMin <- DurationMax <- beh$dur
-    DurAvg <- beh$dur / 60
-    Shallow <- beh$Shallow
-    Deep <- beh$Deep
-    Kmeans <- beh$Kmeans
-    Borderline <- beh$Borderline
-    output <- data.frame(TagID, PTT, RecordNo, MsgCount,
-                         StartTime, EndTime, SeqLag, Event,
-                         Shape, DepthMin, DepthMax, DepthAvg,
-                         DurationMin, DurationMax, DurAvg, Shallow,
-                         Deep, Kmeans, Borderline)
+  #create return data
+  TagID <- tag$info$depid
+  if (length(strsplit(TagID, '-')[[1]]) == 3) {
+    PTT <- strsplit(TagID, '-')[[1]][3]
+  } else {
+    PtT <- NA
+  }
+  MsgCount <- NA
+  SeqLag <- 0
+  RecordNo <- c(1:nrow(beh))
+  StartSeconds <- beh$start
+  EndSeconds <- beh$end
+  StartTime <- beh$start + as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
+  EndTime <- beh$end + as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
+  Event <- beh$type
+  Shape <- beh$shape
+  DepthMin <- DepthMax <- DepthAvg <- beh$max
+  DurationMin <- DurationMax <- beh$dur
+  DurAvg <- beh$dur / 60
+  Shallow <- beh$Shallow
+  Deep <- beh$Deep
+  Kmeans <- beh$Kmeans
+  Borderline <- beh$Borderline
+  output <- data.frame(TagID, PTT, RecordNo, MsgCount,
+                       StartSeconds, EndSeconds,
+                       StartTime, EndTime, SeqLag, Event,
+                       Shape, DepthMin, DepthMax, DepthAvg,
+                       DurationMin, DurationMax, DurAvg, Shallow,
+                       Deep, Kmeans, Borderline)
 
-    if (kclusters == 2) {
-      output <- mark.surfacings(output, lag)
-    }
+  if (kclusters == 2) {
+    output <- mark.surfacings(output)
   }
 
   return(output)
