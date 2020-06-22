@@ -233,6 +233,9 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = 1, wetdry = 100
   pbeforedeepdur <- length(which(pbefore >= mindepth)) / pfs
   pminbefore <- which(pbefore < divestart)[1]
   if ((pminbefore < (pfs*beh$start[1])) & (pbeforedeepdur >= mindur)) {
+    #because find_dives is not pulling the first incomplete dives, pull them manually
+    newp <- c(0,p)
+    dall <- suppressWarnings(find_dives(newp, mindepth, sampling_rate = pfs, surface = divestart, findall = 1))
     start <- dall$end[1]
     end <- beh$start[1]
     dur <- end - start
@@ -248,7 +251,7 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = 1, wetdry = 100
   pminafter <- which(pafter < divestart)[length(which(pafter < divestart))] + length(p[1:(pfs*beh$end[nrow(beh)])])
   if ((pminafter > (pfs*beh$end[nrow(beh)])) & (pafterdeepdur >= mindur)) {
     start <- beh$end[nrow(beh)]
-    end <- dall$end[nrow(dall)]
+    end <- dall$start[nrow(dall)]
     dur <- end - start
     max <- NA
     type <- 'Surface'
@@ -260,6 +263,7 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = 1, wetdry = 100
   if (('wet' %in% names(tag)) & (wd.adjust == TRUE)) {
     wet <- tag$wet$data
     wfs <- tag$wet$sampling_rate
+    wet <- wet[1:(wfs*(length(p)/pfs))]
     if (min(wet) == 0 & max(wet) == 1) {wetdry <- 0.5}
     tdry <- which(c(0, diff(wet > wetdry)) > 0) / wfs
     delete <- c()
@@ -277,30 +281,36 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = 1, wetdry = 100
       if (beh$type[i] == 'Dive') {
         msd <- min(abs(beh$start[i] - twet))
         if (msd < 30) {
-          beh$start[i] <- twet[which(abs(beh$start[i] - twet) == msd)]
+          samps <- twet[which(abs(beh$start[i] - twet) == msd)]
+          beh$start[i] <- samps[length(samps)]
         }
 
         med <- min(abs(beh$end[i] - tdry))
         if (med < 30) {
-          beh$end[i] <- tdry[which(abs(beh$end[i] - tdry) == med)]
+          samps <- tdry[which(abs(beh$end[i] - tdry) == med)]
+          beh$end[i] <- samps[1]
         }
 
         beh$dur[i] <- beh$end[i] - beh$start[i]
       } else {
         msd <- min(abs(beh$start[i] - tdry))
         if (msd < 30) {
-          beh$start[i] <- tdry[which(abs(beh$start[i] - tdry) == msd)]
+          samps <- tdry[which(abs(beh$start[i] - tdry) == msd)]
+          beh$start[i] <- samps[1]
         }
 
         med <- min(abs(beh$end[i] - twet))
         if (med < 30) {
-          beh$end[i] <- twet[which(abs(beh$end[i] - twet) == med)]
+          samps <- twet[which(abs(beh$end[i] - twet) == med)]
+          beh$end[i] <- samps[1]
         }
 
         beh$dur[i] <- beh$end[i] - beh$start[i]
       }
     }
   }
+  beh$start <- round(beh$start)
+  beh$end <- round(beh$end)
 
   # determine deep and shallow durations
   # shallow = dry (e.g. ziphius) or above certain depth (e.g. 2m for physalus)
@@ -308,11 +318,11 @@ simplify.archival <- function(tag, mindepth, mindur, divestart = 1, wetdry = 100
   for (i in 1:nrow(beh)) {
     if (beh$type[i] != 'Surface') {next}
     #Shallow
-    pd <- p[(start*pfs):(end*pfs)]
+    pd <- p[(beh$start[i]*pfs):(beh$end[i]*pfs)]
     beh$Shallow[i] <- Shallow <- length(pd[which(pd < divestart)]) / pfs #anything above divestart is considered dry
 
     #Deep
-    sdepth <- p[(start*pfs):(end*pfs)]
+    sdepth <- p[(beh$start[i]*pfs):(beh$end[i]*pfs)]
     beh$Deep[i] <- (length(sdepth < mindepth) / pfs) - Shallow
   }
 
