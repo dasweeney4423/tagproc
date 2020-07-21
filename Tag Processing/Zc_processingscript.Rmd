@@ -1,0 +1,31 @@
+```{r}
+R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
+tag_folder <- "G:/Shared drives/METR_TagData/Cuvier's beaked/Sat Tag- Raw/Zica-20181009-144031/Zica-20181009-144031-portal"
+WCpretty_dir <- paste0(tag_folder,'/WC-pretty')
+Argos_data <- read.csv(paste0(WCpretty_dir,"/144031_2018-10-09_2018-10-29.kalman.csv"))
+Beh_data <- read.csv(paste0(WCpretty_dir,"/144031-Behavior.csv"))
+split_Beh <- split.dive.msg(Beh_data, kclusters = 2)
+DF_data <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', 
+                          keep_lc = 1, maxredun = 3, duplrec = 'offset', 
+                          minrate = 10, ratecoef = 25, r_only = FALSE)$retained
+crawl_times <- lubridate::force_tz(as.POSIXct(split_Beh$Dives$StartTime, format = "%m/%d/%Y %H:%M:%S"), tzone = 'UTC')
+CRAWL_data <- crawl.apply(DF_data, model.interval = crawl_times, crs = 2230)
+DIVE_data <- bhvr.interpolate(split_Beh$Dives, CRAWL_data$preds, matching = T)
+SL_data <- sun.moon(DIVE_data)
+BATHY_data <- bathy.sync(SL_data)
+View(BATHY_data)
+```
+
+```{r}
+write.csv(DF_data, paste0(WCpretty_dir,'/Douglas_Filtered_Locations.csv'), row.names=F)
+write.csv(BATHY_data, paste0(WCpretty_dir,'/Locations_Behavior_Environment.csv'), row.names=F)
+```
+
+```{R}
+tag_folder <- "G:/Shared drives/METR_TagData/Cuvier's beaked/Sat Tag- Raw/Zica-20181009-144031/Zica-20181009-144031-portal"
+WCpretty_dir <- paste0(tag_folder,'/WC-pretty')
+data <- read_csv(paste0(WCpretty_dir,"/Douglas_Filtered_Locations.csv"), 
+    col_types = cols(Date = col_datetime(format = "%Y-%m-%d %H:%M:%S")))
+CRAWL_data <- crawl.apply(data, model.interval = '4 hours', crs = 2230)$preds
+write.csv(CRAWL_data, paste0(WCpretty_dir,'/CRAWL_Locations_4Hours.csv'), row.names=F)
+```
