@@ -136,8 +136,10 @@ split.dive.msg <- function(data, kclusters = NULL, lag = 15) {
                       Kmeans = dive$Kmeans,
                       Borderline = dive$Borderline)
 
-  if (kclusters == 2) {
-    Dives <- mark.surfacings(Dives, lag)
+  if (!is.null(kclusters)) {
+    if (kclusters == 2) {
+      Dives <- mark.surfacings(Dives, lag)
+    }
   }
 
   return(list(Dives = Dives, Messages = Messages))
