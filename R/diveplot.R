@@ -12,10 +12,10 @@
 #' @param col Line color
 #' @param mars Figure margins
 #' @param plot.records Whether or not to plot record numbers for dives
-#' @param plot.w Width of figure to be made when saving as pdf
-#' @param plot.ratio Ratio of width to height when saving figure as pdf
-#' @param plotfile File path and name of where to save figure as pdf. Default is that a figure is not saved
-#' @return A dive profile is plotted and saved as a pdf is desired
+#' @param plot.w Width of figure to be made when saving as jpeg
+#' @param plot.ratio Ratio of width to height when saving figure as jpeg
+#' @param plotfile File path and name of where to save figure as jpeg. Default is that a figure is not saved
+#' @return A dive profile is plotted and saved as a jpeg is desired
 #' @examples #examples not yet provided, sorry :(
 
 diveplot <- function(data,
@@ -153,9 +153,12 @@ diveplot <- function(data,
   mrplot$tsum[mrplot$tdiff > 20  & substr(mrplot$ev, 1, 3) == "Surface"] <- NA
 
   # Plot it!
-  if (!is.null(plotfile)){
+  if (!is.null(plotfile)) {
     plot.h <- plot.w / plot.ratio
-    pdf(plotfile, width = plot.w, height = plot.h)
+    if (!grepl('\\.jpeg', plotfile)) {
+      plotfile <- paste(plotfile, '.jpeg', sep='')
+    }
+    jpeg(filename = plotfile, width = plot.w, height = plot.h, units = 'in', quality = 100, res = 300)
   }
   par(mar = mars)
   plot(x = mrplot$tsum, y = mrplot$z, type = "l", ylim = c(zmax, zmin), lwd = lwd, col = col, ann = FALSE, axes = FALSE)
@@ -173,3 +176,4 @@ diveplot <- function(data,
     dev.off()
   }
 }
+
