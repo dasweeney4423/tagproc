@@ -62,9 +62,8 @@ split.dive.msg <- function(data, kclusters = NULL, lag = 15) {
   dive$DepthAvg <- round((dive$DepthMin + dive$DepthMax) / 2, digits = 4)
 
   #perform kmeans on dive data
-  dive$Kmeans <- NA
+  dive$Borderline <- dive$Kmeans <- NA
   surfacings <- dive[which(dive$What == 'Surface'),]
-  surfacings$Borderline <- NA
   if (!is.null(kclusters)) {
     kdata <- na.omit(data.frame(dive$DepthAvg, dive$DurAvg))
     kmdata <- na.omit(data.frame(scale(dive$DepthAvg), scale(dive$DurAvg)))
