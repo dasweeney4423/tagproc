@@ -11,6 +11,7 @@
 #' @param lwd Line width
 #' @param col Line color
 #' @param mars Figure margins
+#' @param title Figure title if desired.
 #' @param plot.records Whether or not to plot record numbers for dives
 #' @param plot.w Width of figure to be made when saving as jpeg
 #' @param plot.ratio Ratio of width to height when saving figure as jpeg
@@ -26,6 +27,7 @@ diveplot <- function(data,
                      lwd = 2,
                      col = "black",
                      mars = c(5, 5, 1, 2),
+                     title = NULL,
                      plot.records = FALSE,
                      plot.w = 12, plot.ratio = 2.25,
                      plotfile = NULL) {
@@ -171,6 +173,9 @@ diveplot <- function(data,
     title(xlab = "Local Time", ylab = "Depth (m)", cex.lab = cex.axis)
   } else {
     title(xlab = "Time (GMT)", ylab = "Depth (m)", cex.lab = cex.axis)
+  }
+  if (!is.null(title)) {
+    title(main = title)
   }
   if (!is.null(plotfile)) {
     dev.off()
