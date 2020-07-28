@@ -2,6 +2,7 @@
 #'
 #' This function is used to visualize part or all of a dive profile by plotting dives based on their individual dive shapes
 #' @param data A dataframe that contains the dive depths and shapes from split.dive.msg()
+#' @param tz Time zone for plotting. If NULL, GMT is used.
 #' @param zmin Minimum depth limit for plot
 #' @param zmax Maximum depth limit on plot. If NULL, the maximum depth of all dives is used
 #' @param Re.begin Which dive to begin at? Default is begin at the first dive
@@ -18,6 +19,7 @@
 #' @examples #examples not yet provided, sorry :(
 
 diveplot <- function(data,
+                     tz = NULL,
                      zmin = 0, zmax = NULL,
                      Rec.begin = NULL, Rec.end = NULL,
                      cex.axis = 1,
@@ -130,7 +132,10 @@ diveplot <- function(data,
 
   # Prepare X avis labels
   # Hour nations
-  totdiff <-mrplot$tsum[nrow(mrplot)]
+  if (!is.null(tz)) {
+    mrplot$hr <- lubridate::with_tz(mrplot$hr, tzone = tz)
+  }
+  totdiff <- mrplot$tsum[nrow(mrplot)]
   times <- seq(0, totdiff, length = 5)
   labs <- strptime(mrplot$hr[1], format = "%Y-%m-%d %H:%M:%S", tz = "GMT") + times * 60
   labs <- paste0(substr(labs, 6, 10), " ", substr(labs, 12, 16))
@@ -159,7 +164,11 @@ diveplot <- function(data,
   if (plot.records) {
     axis(3, at = ats, lab = mrplot$ID[markers], cex.axis = .6)
   }
-  title(xlab = "Time (GMT)", ylab = "Depth (m)", cex.lab = cex.axis)
+  if (!is.null(tz)) {
+    title(xlab = "Local Time", ylab = "Depth (m)", cex.lab = cex.axis)
+  } else {
+    title(xlab = "Time (GMT)", ylab = "Depth (m)", cex.lab = cex.axis)
+  }
   if (!is.null(plotfile)) {
     dev.off()
   }
