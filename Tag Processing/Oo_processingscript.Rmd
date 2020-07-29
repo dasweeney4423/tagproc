@@ -4,14 +4,14 @@ tag_folder <- "G:/Shared drives/METR_TagData/Killer whale/Sat tagging/Oo Tag 034
 prettifyWC(tag_folder)
 WCpretty_dir <- paste0(tag_folder,'/WC-pretty')
 Argos_data <- read.csv(paste0(WCpretty_dir,"/94815-Locations.csv"))
-DF_data <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', 
+DF_land <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', 
                           keep_lc = 2, maxredun = 3, duplrec = 'offset', 
                           minrate = 20, ratecoef = 25, r_only = FALSE)$all
 ```
 
 ```{r}
-stime <- lubridate::ceiling_date(DF_data$Date[1], unit = 'days')
-end <- lubridate::floor_date(DF_data$Date[nrow(DF_data)], unit = 'days')
+stime <- lubridate::ceiling_date(DF_land$Date[1], unit = 'days')
+end <- lubridate::floor_date(DF_land$Date[nrow(DF_land)], unit = 'days')
 crawl_times <- c()
 time <- stime
 while (time <= end) {
@@ -20,11 +20,11 @@ while (time <= end) {
 }
 crawl_times <- lubridate::force_tz(as.POSIXct(crawl_times, origin = "1970-01-01 08:00"), tzone = 'UTC')
 if (stime != crawl_times[1]) {stop('crawl_times is off')}
-CRAWL_data <- crawl.apply(DF_data, model.interval = crawl_times, crs = 3310)
+CRAWL_data <- crawl.apply(DF_land, model.interval = crawl_times, crs = 3310)
 Ootrack <- CRAWL_data$preds
 SL_data <- sun.moon(Ootrack)
-BATHY_track <- bathy.sync(SL_data)
-View(BATHY_track)
+BATHY_land <- bathy.sync(SL_data)
+View(BATHY_land)
 ```
 
 ```{r}
@@ -39,9 +39,9 @@ View(BATHY_dives)
 ```
 
 ```{r}
-write.csv(DF_data, paste0(WCpretty_dir,'/94815-DFLocs_2lc-3mr-20mr-25rc.csv'), row.names=F)
+write.csv(DF_land, paste0(WCpretty_dir,'/94815-DFLocs_2lc-3mr-20mr-25rc.csv'), row.names=F)
 
-write.csv(BATHY_track, paste0(WCpretty_dir,'/94815-12hCRAWL_Environment.csv'), row.names=F)
+write.csv(BATHY_land, paste0(WCpretty_dir,'/94815-12hCRAWL_Environment.csv'), row.names=F)
 
 write.csv(BATHY_dives, paste0(WCpretty_dir,'/94815-Behavior_Environment.csv'), row.names=F)
 ```
