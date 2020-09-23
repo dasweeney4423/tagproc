@@ -7,11 +7,12 @@
 #' @param divestart The threshold in meters at which a submergence might be considered a dive. If NULL, then wet/dry data is used for this threshold and the input for wetdry is required.
 #' @param wetdry The wet/dry sensor threshold for determining when the tag is going dry or going wet. Default is 100.
 #' @param kclusters The number of clusters desired to create for k-means clustering of dive depth and dive duration for the output of the Dives data. If left blank, no cluster will be performed.
+#' @param acoustics The csv of acoustic audit data from the tag
 #' @return A data frame with one row for each dive found. The data will have identical olumn names as can be found in a Ptt-Behavior.csv file from the WC portal.
 #' @note This function utilizes the find_dives, load_nc, and fir_nodelay functions in the tagtools package (https://github.com/stacyderuiter/TagTools).
 #' @export
 
-simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 100, kclusters = NULL) {
+simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry = 100, kclusters = NULL, acoustics = NULL) {
   if (is.character(tag)) {
     #load nc file
     load_nc <- function(file, which_vars=NULL){
@@ -261,7 +262,7 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
     find_dives <- function(p, mindepth, sampling_rate = NULL, surface = 1, findall = 0) {
       searchlen <- 20         #how far to look in seconds to find actual surfacing
       dpthresh <- 0.25        #vertical velocity threshold for surfacing
-      dp_lp <- 0.5           #low-pass filter frequency for vertical velocity
+      dp_lp <- 0.25           #low-pass filter frequency for vertical velocity
       #find threshold crossings and surface times
       tth <- which(diff(p > mindepth) > 0)
       tsurf <- which(p < surface)
@@ -582,5 +583,57 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
     output <- mark.surfacings(output)
   }
 
+  #if SMRT with acoustics, determine which dives have foraging
+  output$Foraging <- NA
+  output$ClickStartSeconds <- NA
+  output$ClickEndSeconds <- NA
+  output$ClickStartTime <- NA
+  output$ClickEndTime <- NA
+  output$ClickStartDepth <- NA
+  output$ClickEndDepth <- NA
+  output$ClickStartLag <- NA
+  output$ClickEndLag <- NA
+  if (!is.null(acoustics)) {
+    tagon <- as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
+
+    clicks <- readr::read_csv(acoustics,
+                              col_types = readr::cols(EventEnd = readr::col_datetime(format = "%Y-%m-%d %H:%M:%S"),
+                                                      EventStart = readr::col_datetime(format = "%Y-%m-%d %H:%M:%S")))
+    clicks <- clicks[which(clicks$eventType == 'FD'),]
+    for (i in 1:nrow(output)) {
+      if (output$Event[i] == 'Surface') {next}
+      if (max(clicks$EventStart) < output$StartTime[i]) {
+        output$Foraging[i] <- 'Unknown'
+        next
+      }
+      if (output$TagID[i] == "Zica-20191012-145101") {
+        if (output$StartSeconds[i] %in% c(435052, 427136)) {
+          output$Foraging[i] <- 'Unknown'
+          next
+        }
+      }
+
+      dclicks <- clicks[which(clicks$EventStart >= output$StartTime[i] &
+                                clicks$EventEnd <= output$EndTime[i]),]
+      if (nrow(dclicks) > 0) {
+        output$Foraging[i] <- 'Yes'
+        output$ClickStartSeconds[i] <- abs(difftime(tagon, dclicks$EventStart, units = "secs"))
+        output$ClickEndSeconds[i] <- abs(difftime(tagon, dclicks$EventEnd, units = "secs"))
+        output$ClickStartDepth[i] <- p[(pfs*output$ClickStartSeconds[i])]
+        output$ClickEndDepth[i] <- p[(pfs*output$ClickEndSeconds[i])]
+        output$ClickStartTime[i] <- dclicks$EventStart
+        output$ClickEndTime[i] <- dclicks$EventEnd
+        output$ClickStartLag[i] <- abs(difftime(dclicks$EventStart, output$StartTime[i], units = "mins"))
+        output$ClickEndLag[i] <- abs(difftime(dclicks$EventEnd, output$EndTime[i], units = "mins"))
+      } else {
+        output$Foraging[i] <- 'No'
+      }
+    }
+
+    output$ClickStartTime <- as.POSIXct(output$ClickStartTime, origin = "1970-01-01", tz = 'UTC')
+    output$ClickEndTime <- as.POSIXct(output$ClickEndTime, origin = "1970-01-01", tz = 'UTC')
+  }
+
   return(output)
 }
+
