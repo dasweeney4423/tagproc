@@ -14,26 +14,28 @@ dist2land <- function(data, land, crs, ...) {
 
   if (!is.character(land)) {
     #read in ptolemy land
-    land <- suppressWarnings(land(...))$geometry
+    land <- suppressWarnings(land(...))
     allland <- data.frame()
-    for (l in 1:length(land)) {
-      allland <- rbind(allland, st_coordinates(land[[l]])[,c("X","Y")])
+    for (l in 1:length(land$geometry)) {
+      allland <- rbind(allland, st_coordinates(land$geometry[[l]])[,c("X","Y")])
     }
 
     #convert tag locations to spatial coordinates
     data <- data %>% st_as_sf(coords = c('Longitude','Latitude')) %>%
-      st_set_crs(crs)
+      st_set_crs(as.numeric(strsplit(st_crs(land)$input,':')[[1]][2]))
 
     #calculate distances to land
+    allland <- allland %>% st_as_sf(coords = c('X','Y'), crs = as.numeric(strsplit(st_crs(land)$input,':')[[1]][2]))
+    proj4string(allland) <- CRS("+proj=longlat +init=epsg:3310")
     data$Dist2Land <- geosphere::dist2Line(p = st_coordinates(data$geometry),
-                                           line = allland) / 1000
+                                           line = st_coordinates(allland)) / 1000
   } else {
     #read in land shape file
     land <- st_read(land)$geometry
 
     #convert tag locations to spatial coordinates
     data <- data %>% st_as_sf(coords = c('Longitude','Latitude')) %>%
-      st_set_crs(crs)
+      st_set_crs(st_crs(land))
 
     #calculate distances to land
     data$Dist2Land <- geosphere::dist2Line(p = st_coordinates(data$geometry),
