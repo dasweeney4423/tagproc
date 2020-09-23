@@ -1,17 +1,15 @@
 ```{r}
 R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
-tag_folder <- "G:/Shared drives/METR_TagData/Killer whale/Sat tagging/Oo Tag 034/OoTag034-94815"
-prettifyWC(tag_folder)
+tag_folder <- "G:/Shared drives/METR_TagData/Killer whale/Sat tagging/Oo Tag 036/OoTag036-102464"
+# prettifyWC(tag_folder)
 WCpretty_dir <- paste0(tag_folder,'/WC-pretty')
 Argos_data <- read.csv(paste0(WCpretty_dir,"/94815-Locations.csv"))
-DF_land <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR', 
-                          keep_lc = 2, maxredun = 3, duplrec = 'offset', 
-                          minrate = 20, ratecoef = 25, r_only = FALSE)$all
-```
-
-```{r}
-stime <- lubridate::ceiling_date(DF_land$Date[1], unit = 'days')
-end <- lubridate::floor_date(DF_land$Date[nrow(DF_land)], unit = 'days')
+Argos_data$Date <- as.POSIXct(as.character(Argos_data$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
+# Argos_data <- douglas.filter(Argos_data, argos_method = 'K', method = 'DAR',
+#                           keep_lc = 2, maxredun = 3, duplrec = 'offset', 
+#                           minrate = 20, ratecoef = 25, r_only = FALSE)$all
+stime <- lubridate::ceiling_date(Argos_data$Date[1], unit = 'days')
+end <- lubridate::floor_date(Argos_data$Date[nrow(Argos_data)], unit = 'days')
 crawl_times <- c()
 time <- stime
 while (time <= end) {
@@ -20,28 +18,66 @@ while (time <= end) {
 }
 crawl_times <- lubridate::force_tz(as.POSIXct(crawl_times, origin = "1970-01-01 08:00"), tzone = 'UTC')
 if (stime != crawl_times[1]) {stop('crawl_times is off')}
-CRAWL_data <- crawl.apply(DF_land, model.interval = crawl_times, crs = 3310)
+CRAWL_data <- crawl.apply(Argos_data, model.interval = crawl_times, crs = 3310)
 Ootrack <- CRAWL_data$preds
 SL_data <- sun.moon(Ootrack)
-BATHY_land <- bathy.sync(SL_data)
-View(BATHY_land)
+View(SL_data)
 ```
 
 ```{r}
-Beh_data <- read.csv(paste0(WCpretty_dir,"/94793-Behavior.csv"))
-split_Beh <- split.dive.msg(Beh_data, kclusters = 2)
+write.csv(SL_data, paste0(WCpretty_dir,'/94815-12hCrawlTrack_Environment.csv'), row.names=F)
+```
+
+
+```{r}
+R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
+tag_folder <- "G:/Shared drives/METR_TagData/Killer whale/Sat tagging/Oo Tag 036/OoTag036-102464"
+WCpretty_dir <- paste0(tag_folder,'/WC-pretty')
+Argos_data <- read.csv(paste0(WCpretty_dir,"/102464-Locations.csv"))
+Argos_data$Date <- as.POSIXct(as.character(Argos_data$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
+Beh_data <- read.csv(paste0(WCpretty_dir,"/102464-Behavior.csv"))
+split_Beh <- split.dive.msg(Beh_data)
 crawl_times <- lubridate::force_tz(as.POSIXct(split_Beh$Dives$StartTime, format = "%m/%d/%Y %H:%M:%S"), tzone = 'UTC')
-CRAWL_dives <- crawl.apply(DF_data, model.interval = crawl_times, crs = 2230)
-DIVE_dives <- bhvr.interpolate(split_Beh$Dives, CRAWL_dives$preds, matching = F)
-SL_dives <- sun.moon(DIVE_dives)
-BATHY_dives <- bathy.sync(SL_dives)
-View(BATHY_dives)
+CRAWL_data <- crawl.apply(Argos_data, model.interval = crawl_times, crs = 3310)
+DIVE_data <- bhvr.interpolate(split_Beh$Dives, CRAWL_data$preds, matching = T)
+SL_data <- sun.moon(DIVE_data)
+SL_data<-SL_data[,c(1:3, 5:17, 23, 24, 44:65)]
+SL_data$TimeofDay <- NA
+for (i in 1:nrow(SL_data)) {
+  if (SL_data$sunAltitude[i] < -12) {
+    SL_data$TimeofDay[i] <- 'Night'
+  } else {
+    SL_data$TimeofDay[i] <- 'Day'
+  }
+}
+Oo36 <- SL_data
+
+R.utils::sourceDirectory('C:/Users/marec/Docs/tagproc/R')
+tag_folder <- "G:/Shared drives/METR_TagData/Killer whale/Sat tagging/Oo Tag 041/OoTag041-94805"
+WCpretty_dir <- paste0(tag_folder,'/WC-pretty')
+Argos_data <- read.csv(paste0(WCpretty_dir,"/94805-Locations.csv"))
+Argos_data$Date <- as.POSIXct(as.character(Argos_data$Date), format = '%m/%d/%Y %H:%M:%S', tz='UTC')
+Beh_data <- read.csv(paste0(WCpretty_dir,"/94805-Behavior.csv"))
+split_Beh <- split.dive.msg(Beh_data)
+crawl_times <- lubridate::force_tz(as.POSIXct(split_Beh$Dives$StartTime, format = "%m/%d/%Y %H:%M:%S"), tzone = 'UTC')
+CRAWL_data <- crawl.apply(Argos_data, model.interval = crawl_times, crs = 3310)
+CRAWL_data$preds <- rbind(CRAWL_data$preds[c(1:750),], CRAWL_data$preds[c(750),], CRAWL_data$preds[c(751:nrow(CRAWL_data$preds)),])
+DIVE_data <- bhvr.interpolate(split_Beh$Dives, CRAWL_data$preds, matching = T)
+SL_data <- sun.moon(DIVE_data)
+SL_data<-SL_data[,c(1:3, 5:17, 23, 24, 44:65)]
+SL_data$TimeofDay <- NA
+for (i in 1:nrow(SL_data)) {
+  if (SL_data$sunAltitude[i] < -12) {
+    SL_data$TimeofDay[i] <- 'Night'
+  } else {
+    SL_data$TimeofDay[i] <- 'Day'
+  }
+}
+Oo41 <- SL_data
+
+Oobehlog <- rbind(Oo36, Oo41)
 ```
 
 ```{r}
-write.csv(DF_land, paste0(WCpretty_dir,'/94815-DFLocs_2lc-3mr-20mr-25rc.csv'), row.names=F)
-
-write.csv(BATHY_land, paste0(WCpretty_dir,'/94815-12hCRAWL_Environment.csv'), row.names=F)
-
-write.csv(BATHY_dives, paste0(WCpretty_dir,'/94815-Behavior_Environment.csv'), row.names=F)
+write.csv(Oobehlog, 'Oo36-41_CRAWLBehLog_Environment.csv', row.names=F)
 ```
