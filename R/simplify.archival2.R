@@ -391,7 +391,16 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
     }
 
     #get dive times
-    fdout <- suppressWarnings(find_dives(p, mindepth, sampling_rate = pfs, surface = divestart, findall = 0))
+    if (length(which(is.na(p))) > 0) {
+      #work around missing data in Zica-20190111-173186
+      data1 <- find_dives(p[1:(which(is.na(p))[1]-1)], mindepth, sampling_rate = pfs, surface = divestart, findall = 0)
+      data2 <- find_dives(p[(which(is.na(p))[length(which(is.na(p)))]+1):length(p)], mindepth, sampling_rate = pfs, surface = divestart, findall = 0)
+      data2$start <- data2$start + (which(is.na(p))[length(which(is.na(p)))]+1) - 1
+      data2$end <- data2$end + (which(is.na(p))[length(which(is.na(p)))]+1) - 1
+      fdout <- rbind(data1[c(1:(nrow(data1)-1)),], data2[c(2:nrow(data2)),])
+    } else {
+      fdout <- suppressWarnings(find_dives(p, mindepth, sampling_rate = pfs, surface = divestart, findall = 0))
+    }
     if (p[(fdout$end[nrow(fdout)]*pfs)] > divestart) {
       fdout <- fdout[-nrow(fdout),]
     }
@@ -468,7 +477,18 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
       end <- dives$start[d+1]
       dur <- end - start
       max <- NA
-      type <- 'Surface'
+      if (length(which(is.na(p))) > 0) {
+        #work around missing data in Zica-20190111-173186
+        if (length(unique(c(start:end, 474452:476527))) != length(c(start:end, 474452:476527))) {
+          type <- 'MissingData'
+          Shallow <- Deep <- shape <- Kmeans <- Borderline <- NA
+          row <- data.frame(start, end, dur, max, shape, type, Borderline, Kmeans, Deep, Shallow)
+          surfacings <- rbind(surfacings, row)
+          next
+        } else {
+          type <- 'Surface'
+        }
+      }
 
       # determine deep and shallow durations
       # shallow = dry (e.g. ziphius) or above certain depth (e.g. 2m for physalus)
@@ -492,7 +512,16 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
     beh <- beh[order(beh$start),]
 
     #find dives with incomplete dives
-    dall <- suppressWarnings(find_dives(p, mindepth, sampling_rate = pfs, surface = divestart, findall = 1))
+    if (length(which(is.na(p))) > 0) {
+      #work around missing data in Zica-20190111-173186
+      data1 <- find_dives(p[1:(which(is.na(p))[1]-1)], mindepth, sampling_rate = pfs, surface = divestart, findall = 1)
+      data2 <- find_dives(p[(which(is.na(p))[length(which(is.na(p)))]+1):length(p)], mindepth, sampling_rate = pfs, surface = divestart, findall = 1)
+      data2$start <- data2$start + (which(is.na(p))[length(which(is.na(p)))]+1) - 1
+      data2$end <- data2$end + (which(is.na(p))[length(which(is.na(p)))]+1) - 1
+      dall <- rbind(data1[c(1:(nrow(data1)-1)),], data2[c(2:nrow(data2)),])
+    } else {
+      dall <- suppressWarnings(find_dives(p, mindepth, sampling_rate = pfs, surface = divestart, findall = 1))
+    }
 
     #if surfacing happened before first dive, add it to data
     pbefore <- p[1:(pfs*beh$start[1])]
@@ -634,6 +663,23 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
     output$ClickEndTime <- as.POSIXct(output$ClickEndTime, origin = "1970-01-01", tz = 'UTC')
   }
 
+  #put gps locations onto behaviors
+  gps <- na.omit(tag$GPS_position$data)
+  output$LocationOffsetMins <- output$Longitude <- output$Latitude <- NA
+  for (i in 1:nrow(output)) {
+    dls <- abs(output$StartSeconds[i] - gps[,1])
+    wdls <- which(dls == min(dls))[1]
+    output$Latitude[i] <- gps[wdls,2]
+    output$Longitude[i] <- gps[wdls,3]
+    output$LocationOffsetMins[i] <- dls[wdls]/60
+  }
+
+  #clean up data where weird extra events popped in
+  output <- output[which(output$DurAvg > 0),]
+  output$RecordNo <- NA
+  suppressPackageStartupMessages(suppressWarnings(require(tidyverse)))
+  output <- output %>% distinct()
+  output$RecordNo <- c(1:nrow(output))
+
   return(output)
 }
-
