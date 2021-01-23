@@ -488,6 +488,8 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
         } else {
           type <- 'Surface'
         }
+      } else {
+        type <- 'Surface'
       }
 
       # determine deep and shallow durations
@@ -664,7 +666,8 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
   }
 
   #put gps locations onto behaviors
-  gps <- na.omit(tag$GPS_position$data)
+  gps <- tag$GPS_position$data
+  gps <- gps[which(tag$GPS_residual$data[,2] <= 35 & !is.na(gps[,3])),]
   output$LocationOffsetMins <- output$Longitude <- output$Latitude <- NA
   for (i in 1:nrow(output)) {
     dls <- abs(output$StartSeconds[i] - gps[,1])
