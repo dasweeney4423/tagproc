@@ -8,8 +8,8 @@
 sun.moon <- function(data) {
   data <- data.frame(data)
   TIME <- time.turner(data[, which(names(data) %in% c("Date", "StartTime", 'Day'))])$strp
-  LAT <- data[, which(names(data) %in% c("Latitude", "StartLat"))]
-  LON <- data[, which(names(data) %in% c("Longitude", "StartLon"))]
+  LAT <- data[, which(names(data) %in% c("Latitude", "StartLat", "Lat"))]
+  LON <- data[, which(names(data) %in% c("Longitude", "StartLon", "Long"))]
 
   # Setup variables
   sunrise <- sunset <- solarNoon <- civilDawn <- endDawn <- civilDusk <- startDusk <- rep(NA, times = nrow(data))
