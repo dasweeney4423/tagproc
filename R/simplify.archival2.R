@@ -615,54 +615,36 @@ simplify.archival2 <- function(tag, mindepth, mindur, divestart = NULL, wetdry =
   }
 
   #if SMRT with acoustics, determine which dives have foraging
-  output$Foraging <- NA
-  output$ClickStartSeconds <- NA
-  output$ClickEndSeconds <- NA
-  output$ClickStartTime <- NA
-  output$ClickEndTime <- NA
-  output$ClickStartDepth <- NA
-  output$ClickEndDepth <- NA
-  output$ClickStartLag <- NA
-  output$ClickEndLag <- NA
   if (!is.null(acoustics)) {
     tagon <- as.POSIXct(tag$info$dephist_device_datetime_start, format = "%d-%m-%Y %H:%M:%S", tz = 'UTC')
 
-    clicks <- readr::read_csv(acoustics,
-                              col_types = readr::cols(EventEnd = readr::col_datetime(format = "%Y-%m-%d %H:%M:%S"),
-                                                      EventStart = readr::col_datetime(format = "%Y-%m-%d %H:%M:%S")))
-    clicks <- clicks[which(clicks$eventType == 'FD'),]
-    for (i in 1:nrow(output)) {
-      if (output$Event[i] == 'Surface') {next}
-      if (max(clicks$EventStart) < output$StartTime[i]) {
-        output$Foraging[i] <- 'Unknown'
+    clicks <- read.csv(acoustics)
+    clicks$EventStart <- clicks$EventStart %>% lubridate::ymd_hms(tz = "UTC")
+    clicks$EventEnd <- clicks$EventEnd %>% lubridate::ymd_hms(tz = "UTC")
+    clicks <- clicks[which(clicks$eventType == 'FD          '),]
+    output$Foraging <- output$ClickEndTime <- output$ClickStartTime <- NA
+    for (i in 1:nrow(dives)) {
+      if (output$StartTime[i] > max(clicks$EventEnd)) {
+        output$Foraging[i] <- "Unknown"
         next
       }
-      if (output$TagID[i] == "Zica-20191012-145101") {
-        if (output$StartSeconds[i] %in% c(435052, 427136)) {
-          output$Foraging[i] <- 'Unknown'
-          next
-        }
+      if ((output$TagID[i] == "Zica-20191111-94810") & 
+          (output$Start[i] >= 438636 & output$Start[i] <= 1033614)) {
+        output$Foraging[i] <- "Unknown"
+        next
       }
-
-      dclicks <- clicks[which(clicks$EventStart >= output$StartTime[i] &
-                                clicks$EventEnd <= output$EndTime[i]),]
-      if (nrow(dclicks) > 0) {
-        output$Foraging[i] <- 'Yes'
-        output$ClickStartSeconds[i] <- abs(difftime(tagon, dclicks$EventStart, units = "secs"))
-        output$ClickEndSeconds[i] <- abs(difftime(tagon, dclicks$EventEnd, units = "secs"))
-        output$ClickStartDepth[i] <- p[(pfs*output$ClickStartSeconds[i])]
-        output$ClickEndDepth[i] <- p[(pfs*output$ClickEndSeconds[i])]
-        output$ClickStartTime[i] <- dclicks$EventStart
-        output$ClickEndTime[i] <- dclicks$EventEnd
-        output$ClickStartLag[i] <- abs(difftime(dclicks$EventStart, output$StartTime[i], units = "mins"))
-        output$ClickEndLag[i] <- abs(difftime(dclicks$EventEnd, output$EndTime[i], units = "mins"))
+      diveclicks <- clicks[which(clicks$EventStart >= output$StartTime[i] &
+                                   clicks$EventEnd <= output$EndTime[i]),]
+      if (nrow(diveclicks) > 0) {
+        output$Foraging[i] <- TRUE
+        output$ClickStartTime[i] <- min(diveclicks$EventStart)
+        output$ClickEndTime[i] <- max(diveclicks$EventEnd)
       } else {
-        output$Foraging[i] <- 'No'
+        output$Foraging[i] <- FALSE
       }
     }
-
-    output$ClickStartTime <- as.POSIXct(output$ClickStartTime, origin = "1970-01-01", tz = 'UTC')
-    output$ClickEndTime <- as.POSIXct(output$ClickEndTime, origin = "1970-01-01", tz = 'UTC')
+    output$ClickStartTime <- as.POSIXct(output$ClickStartTime, tz="UTC", origin="1970-01-01")
+    output$ClickEndTime <- as.POSIXct(output$ClickEndTime, tz="UTC", origin="1970-01-01")
   }
 
   #put gps locations onto behaviors
